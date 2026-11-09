@@ -23,9 +23,9 @@ The board sits inline on a vehicle bus, so the firmware is built to be silent un
    - `selftest ext can1 can2`: a bench test that transmits on both channels.
    - `gw on`: forwards frames, so it requires both channels to be in normal mode already.
    - `send`: only works on a channel that is already in normal mode.
-4. **Nothing returns to a transmitting mode by itself.** After a bus-off, a bitrate change or a self-test, the channel comes back in **monitor** mode. The gateway turns off when either channel leaves normal mode. A reboot restores the defaults: both channels in monitor mode, gateway off.
+4. **Nothing returns to a transmitting mode by itself.** After a bus-off, a bitrate change or a self-test, the channel comes back in **monitor** mode. The gateway turns off when either channel leaves normal mode. A reboot restores the defaults: both channels in monitor mode, gateway off. The one exception is sleep: a gateway that T started with `gw on` sleeps with the board and resumes on wake (rule 6).
 5. While any channel can transmit, LED1 blinks fast (5 Hz instead of 1 Hz).
-6. **Sleep never changes this.** The board only auto-sleeps if nothing has been transmit-enabled since boot. On waking it restores each channel to listen-only monitor mode through the same path as boot: Rs stays high until the controller is running. See [Sleep](#sleep-stop-1).
+6. **Sleep keeps whatever was running.** A listening channel wakes up listening. A running gateway wakes up as a running gateway: both channels back in normal mode, same rules, same counters. A channel in normal mode *without* the gateway (a manual transmit session) keeps the board awake, and if it were ever slept with it would come back in monitor mode. Every channel restarts through the same path as boot: Rs stays high until the controller is running. See [Sleep](#sleep-stop-1).
 
 The ROM bootloader (blank chip, or the `dfu` command) probes FDCAN1 on PD0/PD1. That is harmless: the transceiver stays in standby, so the bootloader cannot reach the bus.
 
@@ -152,7 +152,7 @@ screen /dev/cu.usbmodem* 115200        # quit: Ctrl-A then K
 | `gw on` / `gw off` | Turn forwarding on or off. `gw on` requires both channels in normal mode. |
 | `sleep` | Sleep status: on/off, timeout, bus and console idle time, why it is awake, sleep/wake counts, last wake source |
 | `sleep on\|off` / `sleep timeout <s>` | Turn auto-sleep on or off (default on); set the idle time (5–86400 s, default 60). Not saved across reset. |
-| `sleep now` | Sleep immediately, even with USB connected. Refused while a channel can transmit. |
+| `sleep now` | Sleep immediately, even with USB connected. Refused during manual transmit (a channel in normal mode with the gateway off). A running gateway may sleep. |
 | `echo <on\|off>` | Turn local echo and the prompt on or off (off for scripts) |
 | `reset` / `dfu` | Reboot / reboot into the ROM USB DFU bootloader |
 
@@ -196,18 +196,19 @@ The policy is in `lib/power.c`, which is host-tested in `test/test_power.c`. Aut
 - No frame has been received on either channel for the timeout (default 60 s, `sleep timeout <s>`).
 - No console input on USB or UART for the timeout. Plugging or unplugging USB also counts as console input.
 - USB is not mounted by a host (`tud_mounted()`). With a laptop connected, the board never auto-sleeps.
-- No channel is transmit-capable right now (normal mode, gateway on).
-- **Transmit has not been enabled at any point since boot.** That includes `mode canN normal` and `selftest ext`. Once T has explicitly enabled transmit, auto-sleep stays off until a reboot. The reason: a wake-up only ever restores listen-only mode, so a gateway or transmit setup would silently stop working after a sleep. As a result, an installed gateway keeps drawing ~9 mA.
-- At least one channel is in monitor mode. With both channels off, nothing but the UART could wake it.
+- No manual transmit session: no channel is in normal mode with the gateway off. **A running gateway does not block sleep** (decided by T, 2026-11-09): it sleeps on the same idle timers and resumes on wake.
+- At least one channel can wake the board: in monitor mode, or in normal mode under the gateway. With both channels off, nothing but the UART could wake it.
 
-`sleep now` overrides everything except a channel that can currently transmit; in that case it refuses and says why. `sleep` and `status` show what is keeping the board awake.
+`sleep now` overrides everything except a manual transmit session; in that case it refuses and says why. `sleep` and `status` show what is keeping the board awake.
+
+**Gateway while asleep.** The board is inline, so while it sleeps the car side (CAN1) and the module side (CAN2) are **disconnected**: nothing is forwarded until it wakes. That is meant for a parked car whose buses have gone quiet. When either side starts talking again (the car waking up, or a module waking first), the first dominant edge wakes the board and the gateway is back in a few ms. A module that is alone on CAN2 gets no ACK while the board sleeps, so it keeps retransmitting its first frame until the board is up; that frame is then received and forwarded. On CAN1, other nodes ACK, so the frame(s) that woke the board are lost and not forwarded. Check on the bench and in the car that the module side tolerates that gap; if it doesn't, `sleep off` keeps the board awake (~9 mA).
 
 ### What happens (src/sleep.c)
 1. A message goes to both consoles, and the UART drains.
 2. Both FDCANs are stopped, and both Rs pins are driven **high**. That is transceiver standby: the driver is off and the receiver stays on, so RXD still goes low on a dominant bit. The SN65HVD230 has no lower-power mode than standby. The TX pins are parked as recessive GPIO outputs.
 3. USB is detached and powered down (the host sees an unplug), and LED1/LED2 are turned off.
 4. The wake-up sources are armed. A last check runs with interrupts masked: if a frame reached the RX ring, or an RX line is dominant right now, the board aborts and stays awake for another timeout. After that, WFI with LPMS = Stop 1. Flash is powered down in Stop.
-5. On wake the chip is running on HSI16. The firmware reruns `system_clock_init()`: HSE crystal, PLL to 64 MHz, the 40 MHz FDCAN kernel clock, and HSI48 + CRS for USB. It then restarts every channel that was listening, in **bus-monitoring mode, at its previous bitrate and `rslisten` setting**, through the same `chan_configure()` path as boot: Rs goes low only after the controller is running. USB is restarted and the wake source is recorded. The board then stays awake for at least one timeout.
+5. On wake the chip is running on HSI16. The firmware reruns `system_clock_init()`: HSE crystal, PLL to 64 MHz, the 40 MHz FDCAN kernel clock, and HSI48 + CRS for USB. It then restarts every channel in **the mode it had** (monitor, or normal if the gateway is on) **at its previous bitrate and `rslisten` setting**, through the same `chan_configure()` path as boot: Rs goes low only after the controller is running. The gateway's rules and counters are in RAM, which Stop 1 keeps. USB is restarted and the wake source is recorded. The board then stays awake for at least one timeout.
 
 ### Wake sources and the EXTI0 problem
 CAN1 RX is PD0 and CAN2 RX is PB0. Both are **EXTI line 0**, and EXTICR routes each EXTI line to one port only, so GPIO interrupts can't watch both. The fix used here:
@@ -219,12 +220,12 @@ CAN1 RX is PD0 and CAN2 RX is PB0. Both are **EXTI line 0**, and EXTICR routes e
 | UART key | PA3 (USART2 RX) as GPIO input, EXTI3, falling edge (start bit) | J4 on canode; the ST-LINK virtual COM port on the Nucleo. The key itself is lost. |
 | RESET (SW1) | always | |
 
-Only channels that were in monitor mode are armed. FDCAN itself is not a Stop-mode wake-up source on the G0, because its kernel clock stops.
+Only channels that were running (monitor, or normal under the gateway) are armed. FDCAN itself is not a Stop-mode wake-up source on the G0, because its kernel clock stops.
 
 **USB plug-in can't wake the board.** There is no VBUS-sense pin. Detecting the host's 15k pull-downs on D+/D− with an internal pull-up is marginal: about 0.7–1.2 V against a ~1 V input threshold. It would also make the host see a device attach. **If it's asleep and you need the USB console, press RESET (or send any character on the UART).**
 
 ### What you lose
-- **The first frame(s) after a wake.** The FDCAN can't receive until the crystal and PLL are running again. Start-up is roughly 2–3 ms: HSE start-up (typ ~2 ms) plus PLL lock plus channel configuration. All three figures are **UNVERIFIED**, so measure them. On a waking car bus that is a handful of frames. This is acceptable for listen-only logging; it would not be for a gateway, which is one more reason the board never auto-sleeps once transmit was enabled.
+- **The first frame(s) after a wake.** The FDCAN can't receive until the crystal and PLL are running again. Start-up is roughly 2–3 ms: HSE start-up (typ ~2 ms) plus PLL lock plus channel configuration. All three figures are **UNVERIFIED**, so measure them. On a waking car bus that is a handful of frames. For logging that is acceptable. In gateway mode those frames are also not forwarded (see "Gateway while asleep" above).
 - **Time while asleep.** TIM2 and SysTick stop in Stop mode, so `uptime` and candump timestamps don't advance while asleep. A log shows the sleep as a zero-length gap. If wall-clock time matters, run `time` again after a wake.
 - **A misconfigured channel causes a wake loop.** If a monitored bus is active at the wrong bitrate, no frames are received, so the board sleeps, wakes on the first edge, stays up for a timeout, and repeats. That is harmless, but the board is effectively awake. `sleep` shows the wake count.
 
@@ -257,6 +258,7 @@ Compare ~9 mA awake. Leaving D4 unfitted saves another ~0.1–0.17 mA.
   1. Run `sleep timeout 5` with nothing on the buses, measure current at J2 (12 V), and compare it with the table.
   2. Feed frames on CAN1, then on CAN2, at 125k, 500k and 1M, and check `sleep` (last wake, wake count).
   3. Scope RXD1 against Rs1 to measure wake latency.
+  4. Gateway: two CAN adapters, one per side, `gw on` with both channels in normal mode, `sleep timeout 5`. Let it sleep, then send from each side and check the gateway resumes (`status`: forwarded count, both channels `normal`). Note which frames were lost.
 
 ## Nucleo-G0B1RE notes
 - **Clock.** It runs from HSI16, not a crystal. The HSE input only gets the ST-LINK's 8 MHz MCO if solder bridge SB17 is closed, and X3 is not fitted. ST's own Zephyr and TinyUSB board files also use HSI16.

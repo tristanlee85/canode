@@ -96,19 +96,17 @@ uint32_t can_ring_dropped(void);   /* frames lost because the main loop fell beh
  * just went bus-off, so the caller can warn the user. */
 uint8_t can_poll(void);
 
-/* True once can_enable_tx() has been called since boot, even if the channel
- * has since gone back to monitor mode. The sleep policy uses it (lib/power.h). */
-bool can_tx_ever_enabled(void);
-
 /* ---- sleep (src/sleep.c) ----
  * can_sleep_enter(): remember each channel's mode/bitrate, put the transceivers
  * in standby (Rs high), stop both controllers, and park the pins (TX driven
  * recessive, RX as a GPIO input with pull-up, ready for a wake-up trigger).
- * can_sleep_exit(): bring every channel that was listening back in
- * CAN_MODE_MONITOR through the normal configure path (Rs low only after the
- * controller runs). Never restores a TX-capable mode. */
+ * can_sleep_exit(): bring each channel back in the mode it had, through the
+ * normal configure path (Rs low only after the controller runs). Loopback
+ * comes back as monitor. NORMAL is restored only if it is still in the saved
+ * state: src/sleep.c downgrades it to MONITOR unless the gateway (started
+ * by the user's explicit "gw on") is running. */
 typedef struct {
-    can_mode_t mode[CAN_NUM_CHANNELS];     /* CAN_MODE_OFF or CAN_MODE_MONITOR */
+    can_mode_t mode[CAN_NUM_CHANNELS];     /* CAN_MODE_OFF, MONITOR or NORMAL */
     uint32_t   bitrate[CAN_NUM_CHANNELS];
 } can_sleep_state_t;
 void can_sleep_enter(can_sleep_state_t *saved);

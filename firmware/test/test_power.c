@@ -85,36 +85,39 @@ static void test_inhibits(void)
     CHECK_EQ(power_check(&p, 0u), POWER_INHIBIT_TX_NOW);
 }
 
-static void test_tx_latch(void)
+static void test_tx_and_gateway(void)
 {
     power_t p;
     uint32_t late = 10u * T;
 
-    /* TX-capable right now: no auto-sleep, and "sleep now" is refused. */
+    /* Manual transmit (normal mode, gateway off): no auto-sleep, and
+     * "sleep now" is refused. */
     fresh(&p, 0u);
-    power_set_channels(&p, 1u, true, true);
+    power_set_channels(&p, 2u, true, false);
     CHECK_EQ(power_check(&p, late), POWER_INHIBIT_TX_NOW);
     CHECK_EQ(power_check_now(&p), POWER_INHIBIT_TX_NOW);
-
-    /* Back to monitor: the session latch still blocks auto-sleep... */
-    power_set_channels(&p, 3u, false, true);
-    CHECK_EQ(power_check(&p, late), POWER_INHIBIT_TX_SESSION);
-    /* ...even if the driver's flag were somehow cleared... */
-    power_set_channels(&p, 3u, false, false);
-    CHECK_EQ(power_check(&p, late), POWER_INHIBIT_TX_SESSION);
     CHECK_EQ(power_ms_until_sleep(&p, late), UINT32_MAX);
-    /* ...but an explicit "sleep now" is allowed once nothing can transmit. */
+
+    /* Back to monitor: sleeps normally (no latch from the earlier transmit). */
+    power_set_channels(&p, 3u, false, false);
+    CHECK_EQ(power_check(&p, late), POWER_OK);
     CHECK_EQ(power_check_now(&p), POWER_OK);
 
-    /* A transmit that started and ended between two polls (e.g. selftest ext)
-     * is caught through the driver's tx_ever flag alone. */
+    /* Gateway running (both channels normal, both can wake): sleeps like
+     * a listener, on the same idle timers. */
     fresh(&p, 0u);
     power_set_channels(&p, 3u, false, true);
-    CHECK_EQ(power_check(&p, late), POWER_INHIBIT_TX_SESSION);
+    CHECK(p.gateway);
+    CHECK_EQ(power_check(&p, T - 1u), POWER_INHIBIT_CONSOLE);
+    CHECK_EQ(power_check(&p, T), POWER_OK);
+    power_frame(&p, 0u, late);
+    CHECK_EQ(power_check(&p, late + 1u), POWER_INHIBIT_BUS);
+    CHECK_EQ(power_check(&p, late + T), POWER_OK);
+    CHECK_EQ(power_check_now(&p), POWER_OK);
 
-    /* Only a reboot (power_init) clears the latch. */
-    power_init(&p, 0u, true, 60u);
-    CHECK(!p.tx_session);
+    /* ...and the other inhibits still apply to it. */
+    power_set_usb(&p, true, late);
+    CHECK_EQ(power_check(&p, late + 2u * T), POWER_INHIBIT_USB);
 
     /* "sleep now" ignores the other inhibits. */
     fresh(&p, 0u);
@@ -211,14 +214,14 @@ static void test_strings(void)
 
     CHECK_STR(power_inhibit_str(POWER_OK), "none");
     CHECK_STR(power_inhibit_str(POWER_INHIBIT_BUS), "bus active");
-    CHECK(strstr(power_inhibit_str(POWER_INHIBIT_TX_SESSION), "reboot") != NULL);
+    CHECK(strstr(power_inhibit_str(POWER_INHIBIT_TX_NOW), "gateway off") != NULL);
 }
 
 void test_power(void)
 {
     test_basic_timeout();
     test_inhibits();
-    test_tx_latch();
+    test_tx_and_gateway();
     test_wake_and_stats();
     test_timeout_setting();
     test_wrap();

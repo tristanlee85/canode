@@ -54,7 +54,6 @@ static can_chan_info_t     s_info[CAN_NUM_CHANNELS];
 static bool                s_pins_muxed[CAN_NUM_CHANNELS];
 static volatile bool       s_busoff_pending[CAN_NUM_CHANNELS];
 static frame_ring_t        s_ring;
-static bool                s_tx_ever;   /* can_enable_tx() was called since boot (sleep policy) */
 
 /* ---- transceiver ---------------------------------------------------------- */
 
@@ -214,13 +213,7 @@ int can_enable_tx(uint8_t ch, uint32_t bitrate)
 {
     if (ch >= CAN_NUM_CHANNELS)
         return CAN_ERR_ARG;
-    s_tx_ever = true;   /* sticky: blocks auto-sleep until reboot (lib/power.h) */
     return chan_configure(ch, CAN_MODE_NORMAL, bitrate);
-}
-
-bool can_tx_ever_enabled(void)
-{
-    return s_tx_ever;
 }
 
 int can_set_rs_listen(uint8_t ch, can_rs_listen_t v)
@@ -251,9 +244,11 @@ int can_set_loopback(uint8_t ch, uint32_t bitrate)
 void can_sleep_enter(can_sleep_state_t *saved)
 {
     for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
-        /* Rule 4: whatever the channel was doing, it comes back listen-only.
-         * (The sleep policy never sleeps with a TX-capable channel anyway.) */
-        saved->mode[ch] = s_info[ch].mode == CAN_MODE_OFF ? CAN_MODE_OFF : CAN_MODE_MONITOR;
+        /* NORMAL is kept so a sleeping gateway can resume; src/sleep.c
+         * downgrades it to MONITOR if the gateway is not running. Loopback
+         * (self-test) comes back as monitor. */
+        can_mode_t m = s_info[ch].mode;
+        saved->mode[ch] = (m == CAN_MODE_OFF || m == CAN_MODE_NORMAL) ? m : CAN_MODE_MONITOR;
         saved->bitrate[ch] = s_info[ch].bitrate;
 
         /* Rs high (standby: driver off, receiver on) and controller stopped. */
@@ -284,10 +279,10 @@ void can_sleep_exit(const can_sleep_state_t *saved)
 {
     for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
         /* Exactly the boot path: chan_configure() holds Rs high, configures the
-         * controller in bus-monitoring mode, muxes the pins while it is in INIT,
-         * starts it, and only then drives Rs low (if rslisten is low). */
-        if (saved->mode[ch] == CAN_MODE_MONITOR)
-            (void)chan_configure(ch, CAN_MODE_MONITOR, saved->bitrate[ch]);
+         * controller, muxes the pins while it is in INIT, starts it, and only
+         * then drives Rs low (monitor: if rslisten is low; normal: always). */
+        if (saved->mode[ch] != CAN_MODE_OFF)
+            (void)chan_configure(ch, saved->mode[ch], saved->bitrate[ch]);
     }
 }
 

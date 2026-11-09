@@ -159,6 +159,8 @@ static void sleep_status(shell_t *sh)
         }
         shell_puts(sh, "\r\n");
     }
+    if (pm->gateway)
+        shell_puts(sh, "      gateway on: it sleeps with the board and resumes on wake\r\n");
     char src[24];
     power_wake_format(pm->last_wake, src, sizeof(src));
     shell_printf(sh, "      sleeps %" PRIu32 "  wakes %" PRIu32 "  aborted %" PRIu32 "  last wake %s\r\n",
@@ -192,7 +194,8 @@ static int cmd_sleep(shell_t *sh, int argc, char **argv)
         power_inhibit_t why = power_check_now(pm);
         if (why != POWER_OK) {
             shell_printf(sh, "error: not sleeping: %s.\r\n"
-                             "       'mode <can1|can2> monitor' and 'gw off' first.\r\n", power_inhibit_str(why));
+                             "       'mode <can1|can2> monitor' first (a running gateway may sleep).\r\n",
+                         power_inhibit_str(why));
             return -1;
         }
         g_app.sleep_request = true;   /* the main loop sleeps once this reply is out */
@@ -201,7 +204,8 @@ static int cmd_sleep(shell_t *sh, int argc, char **argv)
     shell_puts(sh, "usage: sleep                 status: idle times, why awake, wake count\r\n"
                    "       sleep on|off          auto-sleep when both buses are idle (default on)\r\n"
                    "       sleep timeout <s>     bus/console idle time before sleeping (default 60)\r\n"
-                   "       sleep now             sleep immediately (refused while a channel can transmit)\r\n");
+                   "       sleep now             sleep immediately (refused during manual transmit)\r\n"
+                   "       A running gateway sleeps too, and resumes on wake.\r\n");
     return -1;
 }
 

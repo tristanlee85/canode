@@ -7,12 +7,12 @@
  *
  * Auto-sleep is allowed only when ALL of these hold:
  *   - sleep is enabled ("sleep on", the default),
- *   - no channel is TX-capable right now (normal mode, gateway),
- *   - transmit has not been enabled at any time since boot (sticky: once T has
- *     explicitly enabled transmit, the board never auto-sleeps until a reboot,
- *     because a wake-up only ever restores listen-only mode),
+ *   - no channel is in normal (TX-capable) mode for manual transmit, i.e.
+ *     normal mode WITHOUT the gateway. A running gateway may sleep: the wake-up
+ *     restores both channels to normal mode and the gateway carries on,
  *   - USB is not mounted by a host,
- *   - at least one channel is listening (otherwise nothing but the UART could wake it),
+ *   - at least one channel can wake the board (monitor mode, or normal mode
+ *     under the gateway); otherwise nothing but the UART could wake it,
  *   - no console input for timeout_ms,
  *   - no frame received on either channel for timeout_ms.
  *
@@ -36,10 +36,9 @@
 typedef enum {
     POWER_OK = 0,
     POWER_INHIBIT_DISABLED,     /* "sleep off" */
-    POWER_INHIBIT_TX_NOW,       /* a channel is TX-capable (normal mode or gateway) */
-    POWER_INHIBIT_TX_SESSION,   /* transmit was enabled earlier since boot */
+    POWER_INHIBIT_TX_NOW,       /* a channel is in normal mode without the gateway (manual TX) */
     POWER_INHIBIT_USB,          /* a USB host has the device mounted */
-    POWER_INHIBIT_NO_LISTENER,  /* no channel in monitor mode */
+    POWER_INHIBIT_NO_LISTENER,  /* no channel that could wake the board */
     POWER_INHIBIT_CONSOLE,      /* console input within the timeout */
     POWER_INHIBIT_BUS,          /* a frame was received within the timeout */
 } power_inhibit_t;
@@ -59,9 +58,9 @@ typedef struct {
     uint32_t last_rx_ms[POWER_NUM_CHANNELS];
     uint32_t last_console_ms;
     bool     usb_mounted;
-    bool     tx_now;
-    bool     tx_session;        /* sticky until reboot */
-    uint8_t  listen_mask;       /* bit n: channel n is in monitor mode */
+    bool     tx_now;            /* manual TX: a channel in normal mode, gateway off */
+    bool     gateway;           /* gateway running (sleeps, and resumes on wake) */
+    uint8_t  listen_mask;       /* bit n: channel n can wake the board (monitor, or normal under the gateway) */
 
     /* Statistics. */
     uint32_t sleeps;            /* Stop 1 entries */
@@ -81,9 +80,9 @@ void power_console(power_t *p, uint32_t now_ms);
 /* A change of USB state (plugged in or unplugged) also counts as console
  * activity, so unplugging the laptop gives a full timeout before sleeping. */
 void power_set_usb(power_t *p, bool mounted, uint32_t now_ms);
-/* tx_ever: transmit has been enabled at some point since boot (from can_drv).
- * tx_now or tx_ever latches tx_session until power_init(). */
-void power_set_channels(power_t *p, uint8_t listen_mask, bool tx_now, bool tx_ever);
+/* listen_mask: channels that can wake the board. tx_now: a channel is in
+ * normal mode for manual transmit (gateway off). gateway: the gateway is on. */
+void power_set_channels(power_t *p, uint8_t listen_mask, bool tx_now, bool gateway);
 
 /* Call every main-loop pass: keeps old timestamps from wrapping round to
  * look recent (ages saturate at about 12 days). */
@@ -92,9 +91,9 @@ void power_tick(power_t *p, uint32_t now_ms);
 /* Auto-sleep decision: POWER_OK, or the first reason it is inhibited. */
 power_inhibit_t power_check(const power_t *p, uint32_t now_ms);
 
-/* "sleep now": only refused while a channel is TX-capable (POWER_INHIBIT_TX_NOW).
- * Everything else (USB, timers, the session latch, "sleep off") is overridden
- * by the explicit command. */
+/* "sleep now": only refused during manual transmit (POWER_INHIBIT_TX_NOW).
+ * Everything else (USB, timers, "sleep off") is overridden by the explicit
+ * command. A running gateway is allowed. */
 power_inhibit_t power_check_now(const power_t *p);
 
 /* Milliseconds since the last frame on either channel (the smaller age). */

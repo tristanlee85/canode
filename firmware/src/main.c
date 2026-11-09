@@ -95,17 +95,21 @@ static void handle_frame(can_frame_t *f)
 static void power_update(void)
 {
     uint32_t now = system_millis();
-    uint8_t listen = 0;
-    bool tx_now = g_app.gw_enabled;
+    uint8_t wake = 0;
+    bool gw = g_app.gw_enabled;
+    bool tx_manual = false;
     for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
         can_mode_t m = can_info(ch)->mode;
-        if (m == CAN_MODE_MONITOR)
-            listen |= (uint8_t)(1u << ch);
-        if (m == CAN_MODE_NORMAL)
-            tx_now = true;
+        /* A gateway channel (normal mode) can wake the board and resumes
+         * after the wake; normal mode without the gateway is a manual
+         * transmit session and keeps the board awake. */
+        if (m == CAN_MODE_MONITOR || (gw && m == CAN_MODE_NORMAL))
+            wake |= (uint8_t)(1u << ch);
+        if (m == CAN_MODE_NORMAL && !gw)
+            tx_manual = true;
     }
     power_set_usb(&g_app.power, usb_mounted(), now);
-    power_set_channels(&g_app.power, listen, tx_now, can_tx_ever_enabled());
+    power_set_channels(&g_app.power, wake, tx_manual, gw);
     power_tick(&g_app.power, now);
 
     if (g_app.sleep_request) {

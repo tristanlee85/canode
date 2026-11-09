@@ -54,12 +54,11 @@ void power_set_usb(power_t *p, bool mounted, uint32_t now_ms)
     p->usb_mounted = mounted;
 }
 
-void power_set_channels(power_t *p, uint8_t listen_mask, bool tx_now, bool tx_ever)
+void power_set_channels(power_t *p, uint8_t listen_mask, bool tx_now, bool gateway)
 {
     p->listen_mask = listen_mask;
     p->tx_now = tx_now;
-    if (tx_now || tx_ever)
-        p->tx_session = true;
+    p->gateway = gateway;
 }
 
 void power_tick(power_t *p, uint32_t now_ms)
@@ -95,8 +94,6 @@ static power_inhibit_t check_static(const power_t *p)
         return POWER_INHIBIT_DISABLED;
     if (p->tx_now)
         return POWER_INHIBIT_TX_NOW;
-    if (p->tx_session)
-        return POWER_INHIBIT_TX_SESSION;
     if (p->usb_mounted)
         return POWER_INHIBIT_USB;
     if (p->listen_mask == 0u)
@@ -169,10 +166,9 @@ const char *power_inhibit_str(power_inhibit_t r)
     switch (r) {
     case POWER_OK:                  return "none";
     case POWER_INHIBIT_DISABLED:    return "sleep is off";
-    case POWER_INHIBIT_TX_NOW:      return "a channel is transmit-enabled (normal mode or gateway)";
-    case POWER_INHIBIT_TX_SESSION:  return "transmit was enabled since boot (reboot to re-arm auto-sleep)";
+    case POWER_INHIBIT_TX_NOW:      return "a channel is in normal mode for manual transmit (gateway off)";
     case POWER_INHIBIT_USB:         return "USB host connected";
-    case POWER_INHIBIT_NO_LISTENER: return "no channel is in monitor mode";
+    case POWER_INHIBIT_NO_LISTENER: return "no channel can wake the board (both off)";
     case POWER_INHIBIT_CONSOLE:     return "console in use";
     case POWER_INHIBIT_BUS:         return "bus active";
     default:                        return "?";

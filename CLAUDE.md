@@ -8,16 +8,15 @@ The owner (T) is a software engineer and mechanic. He has built standalone ECUs 
 **Status (2026-11-09):** Rev A passes ERC/DRC and validation steps 1–7 and 9, and is ready to order once J2's pin order and U1's pin-1 mark (JLC preview) are checked. Input protection was updated for the 35 V suppressed load dump (`validation/reports/2026-11-09_protection.md`). U1 is now the STM32G0B1CEU6 (UFQFPN-48). Firmware builds for canode and NUCLEO-G0B1RE; untested on hardware.
 
 ## Resume point (updated 2026-11-09)
-Work is on branch `rev-a-kicad10` (pushed; not yet merged to `main`, no PR opened). `make check` was clean at the last commit.
+All work is on `main` (pushed). `make check` was clean at the last commit.
 
-Done on this branch: KiCad 10 upgrade, DRC fixes, U1 → STM32G0B1CEU6 (UFQFPN-48, `validation/reports/2026-11-09_u1-qfn.md`), firmware (canode + Nucleo, host tests), ngspice sims, enclosure + renders, input-protection redesign (`validation/reports/2026-11-09_protection.md`), firmware Stop 1 sleep.
+Done so far: KiCad 10 upgrade, DRC fixes, U1 → STM32G0B1CEU6 (UFQFPN-48, `validation/reports/2026-11-09_u1-qfn.md`), firmware (canode + Nucleo, host tests), ngspice sims, enclosure + renders, input-protection redesign (`validation/reports/2026-11-09_protection.md`), firmware Stop 1 sleep. T chose (2026-11-09) to let a running gateway sleep and resume on wake (car and module sides are disconnected while asleep).
 
 Next steps, in order:
-1. **T decides: sleep while gatewaying.** Today the board never auto-sleeps once TX/gateway has been enabled since boot (~8–9 mA forever on an always-hot inline install), and wakes into listen-only. Options to discuss: (a) gateway mode allowed to sleep, waking straight back into gateway with the first frame(s) lost; (b) pass-through relay/bypass so the car works while the node sleeps (hardware change); (c) keep as is and power from a switched feed. Code: `firmware/src/sleep.c`, `firmware/lib/power.c`.
-2. **Pre-order checks (T, by hand):** J2 Molex 43045 pin order vs the Molex drawing; U1 pin-1 mark and D3 (SMC, new package) orientation in JLC's placement preview.
-3. **Order rev A** from `hardware/fab/` (or `make fab` → `build/fab/`). Then open a PR / merge `rev-a-kicad10` → `main` if T wants.
-4. **Bench bring-up once boards arrive** (see `validation/README.md` for the full plan): sleep current at J2 (`sleep timeout 5`), wake on each bus at 125k/500k/1M, USB re-enumerates after RESET, `rslisten high` reception at 500k, crank-dip behavior of +3V3.
-5. Optional: tidy autorouted crystal/USB traces (ask T first: layout taste); consider a stiffer PTC if one appears at JLC (F1 37.8/40 A Imax in reverse-battery sim).
+1. **Pre-order checks (T, by hand):** J2 Molex 43045 pin order vs the Molex drawing; U1 pin-1 mark and D3 (SMC, new package) orientation in JLC's placement preview.
+2. **Order rev A** from `hardware/fab/` (or `make fab` → `build/fab/`).
+3. **Bench bring-up once boards arrive** (see `validation/README.md` for the full plan): sleep current at J2 (`sleep timeout 5`), wake on each bus at 125k/500k/1M, USB re-enumerates after RESET, `rslisten high` reception at 500k, crank-dip behavior of +3V3, and gateway sleep/resume (`firmware/README.md`, Sleep, bench step 4).
+4. Optional: tidy autorouted crystal/USB traces (ask T first: layout taste); consider a stiffer PTC if one appears at JLC (F1 37.8/40 A Imax in reverse-battery sim).
 
 ## Layout
 ```
@@ -57,6 +56,7 @@ make test-tools  # offline tests for tools/canlog
 ```
 
 ## How to work here
+- **Git:** commit straight to `main` and push to `origin main`. No feature branches, no PRs (T's standing preference).
 - Follow `validation/README.md` in order and update its status table. Write each step's findings to `validation/reports/YYYY-MM-DD_<step>.md`: what was checked, what passed, what changed.
 - **ERC on this schematic:** nets connect by label stubs, not drawn wires. Expect possible warnings about PWR_FLAG or power-pin driving. Fix real errors in the schematic; explain anything you decide to leave.
 - **Editing KiCad files:** the S-expression files can be edited as text, but keep changes small and surgical. After any edit, run `make check` and `make fab`, and say what changed. Ask T to make anything involving layout or routing taste in the GUI, or propose the exact change.
@@ -73,7 +73,7 @@ make test-tools  # offline tests for tools/canlog
 
 ## Known open issues (from the rev A review checklist)
 - Not rated for an unsuppressed (87 V) load dump; designed for the 35 V suppressed dump and ISO 7637-2 pulse 2a (SMCJ33A + R17 10 Ω/C1 10 µF ahead of the LDO + R18 2.2 Ω in the D7 path). F1 reaches 37.8 A of its 40 A Imax in a reverse-battery sim.
-- Quiescent draw on an always-hot feed: ~8–9 mA awake. Firmware Stop 1 sleep (`sleep` command, `lib/power.c`, `src/sleep.c`) gets ~1 mA including the power LED (R1 now 4.7 kΩ). Untested on hardware; never auto-sleeps once transmit was enabled since boot. CAN2 wakes via COMP3 on PB0, because PB0 and PD0 share EXTI line 0.
+- Quiescent draw on an always-hot feed: ~8–9 mA awake. Firmware Stop 1 sleep (`sleep` command, `lib/power.c`, `src/sleep.c`) gets ~1 mA including the power LED (R1 now 4.7 kΩ). Untested on hardware. A running gateway sleeps too and resumes on wake (car/module sides disconnected while asleep; waking frame(s) not forwarded); only manual transmit (normal mode, gateway off) keeps it awake. CAN2 wakes via COMP3 on PB0, because PB0 and PD0 share EXTI line 0.
 - J2 (Molex 43045) physical pin order is unverified against the Molex drawing: check before crimping a harness.
 - SN65HVD230 with Rs high is TI's standby = receiver-only mode, i.e. a hardware listen-only state. Firmware supports `rslisten high`; bench-test reception at 500k before making it the default.
 - When used inline (MITM), each cut bus segment may need its own termination: measure each segment before deciding on JP1/JP2.

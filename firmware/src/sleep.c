@@ -28,12 +28,19 @@
  * Exit: the chip wakes on HSI16 with the PLL, HSE and HSI48 off. Restore the
  * tick, rerun system_clock_init() (HSE -> PLL 64 MHz, PLLQ 40 MHz FDCAN kernel
  * clock, HSI48 + CRS for USB), give PA3 back to the USART, restart each
- * channel that was listening through the normal configure path (bus
- * monitoring, Rs low only after the controller runs), restart USB.
+ * channel in the mode it had through the normal configure path (Rs low only
+ * after the controller runs), restart USB.
+ *
+ * Gateway: if the gateway is on (T's explicit "gw on", both channels in
+ * normal mode), it is allowed to sleep. Both channels are armed for wake-up
+ * and come back in normal mode, so the gateway resumes by itself. Without
+ * the gateway, a normal-mode channel is never slept with (lib/power.c), and
+ * as a backstop is restored as monitor here.
  *
  * The frame (or frames) that woke us are lost: the controller needs the
- * clock back (crystal start-up, ~ms) before it can receive. That is fine for
- * listen-only use and is stated in the README.
+ * clock back (crystal start-up, ~ms) before it can receive. In gateway mode
+ * that means they are not forwarded either; a sender alone on its segment
+ * gets no ACK and keeps retrying until we are back. See the README.
  */
 #include "sleep.h"
 
@@ -133,17 +140,18 @@ static void arm_comp3(void)
 }
 #endif
 
-/* Returns the EXTI lines armed. Only channels that were listening can wake
- * us: waking for a channel that is switched off would just loop. */
+/* Returns the EXTI lines armed. Only channels that were running (monitor, or
+ * normal under the gateway) can wake us: waking for a channel that is
+ * switched off would just loop. */
 static uint32_t wake_arm(const can_sleep_state_t *saved)
 {
     uint32_t lines = 0;
-    if (saved->mode[0] == CAN_MODE_MONITOR) {
+    if (saved->mode[0] != CAN_MODE_OFF) {
         arm_pin(BOARD_CAN1_PORT, BOARD_CAN1_RX_PIN);
         lines |= EXTI_CAN1;
     }
 #if BOARD_WAKE_CAN2_COMP
-    if (saved->mode[1] == CAN_MODE_MONITOR) {
+    if (saved->mode[1] != CAN_MODE_OFF) {
         arm_comp3();
         lines |= EXTI_COMP3;
     }
@@ -209,9 +217,11 @@ void sleep_run(bool forced)
     power_t *pm = &g_app.power;
     char src[24];
 
-    console_broadcast("\r\nsleep: %s, entering Stop 1. Wakes on CAN traffic or a key on the UART.\r\n"
+    bool gw = g_app.gw_enabled;
+    console_broadcast("\r\nsleep: %s, entering Stop 1. Wakes on CAN traffic or a key on the UART.%s\r\n"
                       "       USB will disconnect; press RESET (or a UART key) to get it back.\r\n",
-                      forced ? "'sleep now'" : "buses idle");
+                      forced ? "'sleep now'" : "buses idle",
+                      gw ? " The gateway resumes on wake." : "");
     uint32_t t = system_millis();
     while (system_millis() - t < 50u)
         usb_poll();   /* lets a 'sleep now' reply reach a USB host */
@@ -227,6 +237,12 @@ void sleep_run(bool forced)
     /* 2-4. Quiet the board and arm the wake-ups. */
     can_sleep_state_t saved;
     can_sleep_enter(&saved);
+    /* Only the gateway may come back TX-capable (the policy never sleeps
+     * with a manual normal-mode channel; this is the backstop). */
+    for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
+        if (saved.mode[ch] == CAN_MODE_NORMAL && !gw)
+            saved.mode[ch] = CAN_MODE_MONITOR;
+    }
     usb_stop();
     leds_off();
     uint32_t lines = wake_arm(&saved);
@@ -274,7 +290,7 @@ void sleep_run(bool forced)
     if (!aborted)
         system_clock_init();
     uart_pins_wake();
-    can_sleep_exit(&saved);   /* listen-only again; Rs low only after start */
+    can_sleep_exit(&saved);   /* previous modes; Rs low only after start */
     usb_init();
 
     uint32_t now = system_millis();
@@ -285,9 +301,11 @@ void sleep_run(bool forced)
     }
     power_on_wake(pm, wake_sources(fired), now);
     power_wake_format(pm->last_wake, src, sizeof(src));
-    console_broadcast("sleep: woke on %s (wake %" PRIu32 "). Clock %s. Channels back in listen-only monitor mode.\r\n"
+    console_broadcast("sleep: woke on %s (wake %" PRIu32 "). Clock %s. %s\r\n"
                       "       The first frame(s) were lost; uptime and log timestamps paused while asleep.\r\n",
-                      src, pm->wakes, system_clock_source());
+                      src, pm->wakes, system_clock_source(),
+                      gw ? "Gateway resumed (both channels in normal mode)."
+                         : "Channels back in listen-only monitor mode.");
 }
 
 /* The wake-up IRQs are only ever enabled with PRIMASK set and are disabled

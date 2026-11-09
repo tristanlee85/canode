@@ -10,7 +10,8 @@
 void sleep_init(void);
 
 /* Enter Stop 1 now and return after waking up, with clocks, both CAN channels
- * (listen-only, as before) and USB restored. Returns early, without sleeping,
+ * (in the mode they had: monitor, or normal if the gateway is on) and USB
+ * restored. Returns early, without sleeping,
  * if CAN traffic shows up during entry. forced = "sleep now" (for the message). */
 void sleep_run(bool forced);
 

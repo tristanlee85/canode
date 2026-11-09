@@ -85,7 +85,7 @@ Bare-metal C, CMake and `arm-none-eabi-gcc`, with ST's HAL for clocks/GPIO/FDCAN
 ## Known limits
 
 1. **Load dump.** The input is built for the 35 V *suppressed* load dump that modern alternators produce: the SMCJ33A TVS doesn't conduct, and a 10 Ω + 10 µF filter keeps fast spikes under 30 V at the LDO. The board is **not** rated for an *unsuppressed* load dump (87 V). Details: [`validation/reports/2026-11-09_protection.md`](validation/reports/2026-11-09_protection.md).
-2. **Quiescent current on an always-hot feed** is about 9 mA while the MCU is awake. The firmware now sleeps (STM32 Stop 1) after 60 s of bus silence and wakes on CAN1, CAN2 or a UART key. The estimated sleep draw is ~0.9 mA, plus ~0.1–0.17 mA for the always-on power LED (R1 is now 4.7 kΩ), so about 1 mA in total. Sleep is untested on hardware, and the board stays awake once transmit or the gateway has been enabled. Details: [`firmware/README.md`](firmware/README.md#sleep-stop-1).
+2. **Quiescent current on an always-hot feed** is about 9 mA while the MCU is awake. The firmware now sleeps (STM32 Stop 1) after 60 s of bus silence and wakes on CAN1, CAN2 or a UART key. The estimated sleep draw is ~0.9 mA, plus ~0.1–0.17 mA for the always-on power LED (R1 is now 4.7 kΩ), so about 1 mA in total. A running gateway sleeps too and resumes on wake; while asleep, the car and module sides are disconnected, and the frame(s) that wake it aren't forwarded. Sleep is untested on hardware. Details: [`firmware/README.md`](firmware/README.md#sleep-stop-1).
 3. **Unverified before ordering:** J2's physical pin order against the Molex 43045 drawing, and U1's pin-1 mark in JLC's placement preview (the package changed to QFN).
 
 ## Repo map
