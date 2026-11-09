@@ -18,10 +18,11 @@ erc:                           ## schematic electrical rules
 	$(KICAD_CLI) sch erc --severity-all --format report -o $(BUILD)/erc.rpt $(SCH) || true
 	$(KICAD_CLI) sch erc --severity-error --exit-code-violations --format json -o $(BUILD)/erc.json $(SCH)
 
-drc:                           ## board design rules + schematic/board parity
+drc:                           ## board design rules + schematic/board parity (footprints and pad nets)
 	@mkdir -p $(BUILD)
 	$(KICAD_CLI) pcb drc --severity-all --schematic-parity --format report -o $(BUILD)/drc.rpt $(PCB) || true
 	$(KICAD_CLI) pcb drc --severity-error --schematic-parity --exit-code-violations --format json -o $(BUILD)/drc.json $(PCB)
+	$(PY) validation/check_netparity.py --kicad-cli "$(KICAD_CLI)"
 
 fab:                           ## JLC gerbers/BOM/CPL into build/fab
 	$(PY) hardware/scripts/jlc_fab.py --kicad-cli "$(KICAD_CLI)"

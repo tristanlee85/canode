@@ -29,14 +29,17 @@ RES = (1600, 1000)
 PCB_T = 1.6
 Z_BOT, Z_SPLIT, Z_TOP = -6.0, 12.0, 14.0
 H1, H2 = (103.5, -103.5), (181.5, -146.5)
-J2_PINS = [(110.5, -114.0 - 3 * i) for i in range(4)] + [(107.5, -114.0 - 3 * i) for i in range(4)]
+J2_PINS = [(110.5, -114.0 - 3 * i) for i in range(6)] + [(107.5, -114.0 - 3 * i) for i in range(6)]
 PLUG_TOP = PCB_T + 17.27
 USB_Y, USB_ZC, WALL_X = -125.0, PCB_T + 1.63, 187.5
 LEDS = {"D4": (153.5, -103.0, (0.1, 1.0, 0.15)), "D5": (161.5, -103.0, (1.0, 0.75, 0.05)),
         "D6": (161.5, -105.5, (1.0, 0.08, 0.04))}
-# wire colours by J2 pin (1..8): 12V, CAN1H, CAN2H, AUX_IN, GND, CAN1L, CAN2L, AUX_OUT
+# wire colours by J2 pin (1..12): 12V, CAN1H, CAN2H, AUX_IN, IGN, AUX_IN2,
+#                                 GND, CAN1L, CAN2L, AUX_OUT, ID, GND
 WIRE_COL = [(0.55, 0.02, 0.02), (0.75, 0.55, 0.02), (0.85, 0.85, 0.82), (0.25, 0.05, 0.35),
-            (0.015, 0.015, 0.015), (0.03, 0.30, 0.06), (0.02, 0.10, 0.45), (0.25, 0.25, 0.25)]
+            (0.80, 0.30, 0.02), (0.30, 0.12, 0.04),
+            (0.015, 0.015, 0.015), (0.03, 0.30, 0.06), (0.02, 0.10, 0.45), (0.25, 0.25, 0.25),
+            (0.55, 0.45, 0.70), (0.015, 0.015, 0.015)]
 
 
 def v(x, y, z):
@@ -217,7 +220,7 @@ def harness(lift=0.0, loom=None):
     """Eight wires out of the Micro-Fit plug, gathered into a loom heading off to -X.
     loom: optional list of extra (x, y, z) mm points the loom follows after the default start."""
     objs = []
-    cx, cy = 109.0, -118.5
+    cx, cy = 109.0, -121.5
     for i, (x, y) in enumerate(J2_PINS):
         col = WIRE_COL[i]
         m = principled(f"wire{i + 1}", col, rough=0.38)
@@ -382,12 +385,12 @@ VEHICLES = {
     "ford": dict(title="Ford Bronco Sport: inline at the gateway module (GWM)",
                  rows=2, cols=12, pitch=2.8, body=(0.014, 0.014, 0.015), lock="lever",
                  lock_col=(0.30, 0.31, 0.33), module="GWM"),
-    "gm": dict(title="Chevrolet Silverado 3500: inline at a body-network module",
+    "gm": dict(title="Chevrolet Silverado 3500: inline at the CAN gateway",
                rows=2, cols=8, pitch=3.5, body=(0.40, 0.41, 0.43), lock="cpa",
-               lock_col=(0.80, 0.10, 0.05), module="MODULE"),
-    "bmw": dict(title="BMW F80 M3: inline at a body-network module",
+               lock_col=(0.80, 0.10, 0.05), module="GATEWAY"),
+    "bmw": dict(title="BMW F80 M3: inline at the CAN gateway",
                 rows=3, cols=9, pitch=2.5, body=(0.014, 0.014, 0.015), lock="slider",
-                lock_col=(0.42, 0.20, 0.55), module="MODULE"),
+                lock_col=(0.42, 0.20, 0.55), module="GATEWAY"),
 }
 
 
@@ -486,6 +489,23 @@ def floor_text(name, body, at_mm, size_mm, rot=0.0, mat=None):
     return o
 
 
+def dtm_pair(x, y, z):
+    """Representative Deutsch DTM 12-way pair, mated, lying along X with the mating face at x.
+    +X side: DTM04 receptacle (pigtail, pin contacts); -X side: DTM06 plug (T-harness, sockets).
+    Returns (objects, pigtail-side cable exit, T-harness-side cable exit) in mm."""
+    grey = principled("DTM grey", (0.30, 0.31, 0.32), rough=0.45)
+    wedge = principled("DTM wedge", (0.85, 0.40, 0.05), rough=0.4)
+    objs = [
+        rounded_box("dtm_rcpt", (16 * MM, 22 * MM, 11 * MM), 1.2 * MM, grey, v(x + 8, y, z)),
+        rounded_box("dtm_rcpt_seal", (4 * MM, 18 * MM, 8.5 * MM), 1.5 * MM, mats()["pvc_black"], v(x + 18, y, z)),
+        rounded_box("dtm_plug", (18 * MM, 20 * MM, 9.5 * MM), 1.2 * MM, grey, v(x - 9, y, z)),
+        rounded_box("dtm_plug_latch", (8 * MM, 5 * MM, 1.6 * MM), 0.5 * MM, grey, v(x - 2, y, z + 5.4)),
+        rounded_box("dtm_wedge", (2.0 * MM, 20.4 * MM, 7.0 * MM), 0.3 * MM, wedge, v(x - 1.2, y, z)),
+        rounded_box("dtm_plug_seal", (4 * MM, 16 * MM, 7.5 * MM), 1.5 * MM, mats()["pvc_black"], v(x - 20, y, z)),
+    ]
+    return objs, (x + 20, y, z), (x - 22, y, z)
+
+
 def vehicle_harness(veh):
     """canode's J2 loom running to a T-harness that sits between a module and its factory
     connector. CAN H/L from the factory side go to CAN1, the module side's to CAN2; every
@@ -520,14 +540,21 @@ def vehicle_harness(veh):
     factory_loom = curve_obj("factory_loom", [v(*rear_f), v(rear_f[0], rear_f[1] + 16, fl + 7),
                                               v(X0 - 30, 18, fl + 6.5), v(X0 - 120, 50, fl + 6.5), v(X0 - 260, 90, fl + 6.5)],
                              5.0 * MM, mats()["pvc_black"])
-    # canode's J2 loom: up out of the plug, then down to the floor and into the splice
-    loom = [(60.0, -116.0, 30.0), (30.0, -117.0, fl + 7.0), (X0 + 5.5, sp[1], sp[2])]
+    # canode's pigtail: up out of the J2 plug, down to the floor, into the universal DTM pair;
+    # the T-harness branch runs from the DTM plug to the splice
+    dz = fl + 5.5
+    o, pig_end, t_end = dtm_pair(20.0, -117.5, dz)
+    objs += o
+    loom = [(66.0, -116.0, 30.0), (52.0, -117.0, fl + 7.0), (pig_end[0] + 2, pig_end[1], dz)]
     objs += harness(loom=loom)
+    objs.append(curve_obj("leg_canode", [v(*t_end), v(t_end[0] - 12, t_end[1], dz),
+                                         v(X0 + 5.5, sp[1], sp[2])], 3.6 * MM, leg))
     # labels on the floor
     objs.append(floor_text("lbl_factory", "factory connector", (X0 + 48, -40, fl + 0.05), 7.0))
     objs.append(floor_text("lbl_header", "adapter", (X0 + 34, -76, fl + 0.05), 7.0))
-    objs.append(floor_text("lbl_adapter", "per-vehicle T-harness", (X0 + 62, -136, fl + 0.05), 7.0))
-    objs.append(floor_text("lbl_module", "adapter into module", (X0 + 80, -186, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_adapter", "per-vehicle T-harness", (X0 + 75, -160, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_dtm", "universal 12-way (DTM)", (22, -136, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_module", "adapter into gateway", (X0 + 80, -186, fl + 0.05), 7.0))
     objs.append(floor_text("lbl_title", spec["title"], (60, -236, fl + 0.05), 7.5))
     return objs, factory_loom
 

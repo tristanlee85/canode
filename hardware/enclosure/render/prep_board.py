@@ -21,7 +21,7 @@ LOCAL = ROOT / "hardware" / "3dmodels"
 DST = ROOT / "build" / "renders" / "board"
 
 LOCAL_MODELS = {
-    "Molex_Micro-Fit_3.0_43045-0812_2x04_P3.00mm_Vertical",
+    "Molex_Micro-Fit_3.0_43045-1212_2x06_P3.00mm_Vertical",
     "USB_C_Receptacle_HRO_TYPE-C-31-M-12",
     "SW_Push_1P1T_XKB_TS-1187A",
 }

@@ -13,8 +13,8 @@ Target vehicles: 2021 Ford Bronco Sport (HS/MS-CAN), 2019 Chevrolet Silverado 35
 | MCU | STM32G0B1CEU6 (UFQFPN-48): Cortex-M0+ 64 MHz, 2× FDCAN, crystal-less USB FS, 512 KB flash |
 | CAN | 2× SN65HVD230 (3.3 V, classic CAN to 1 Mbit/s); held in standby by hardware until firmware enables them; optional 120 Ω termination per channel (solder jumper) |
 | Power | 12 V input (PTC, 1500 W TVS, reverse-polarity diode, RC filter) or USB, into a TPS7B69 40 V LDO; sleeps at about 1 mA when the buses go quiet |
-| I/O | VBAT and AUX_IN voltage sense, AUX_OUT low-side switch, SWD, UART, 4 spare GPIO |
-| Harness | Molex Micro-Fit 3.0, 2×4 |
+| I/O | Four 0–36 V sense inputs (VBAT, AUX_IN, IGN_IN, AUX_IN2), harness-ID input, AUX_OUT low-side switch, SWD, UART, 4 spare GPIO |
+| Harness | Molex Micro-Fit 3.0, 2×6 on the board; universal pigtail to a per-vehicle T-harness |
 | Board | 85 × 50 mm, 2 layers; every SMD part on top for JLCPCB Economic assembly |
 | Enclosure | 90 × 55 × 20 mm MJF nylon, ordered from JLC3DP (no printer needed) |
 
@@ -67,40 +67,50 @@ Regenerate every image with `make renders` (KiCad 10, Blender, uv; about 10 minu
 
 ## In the car: one board, a harness per vehicle
 
-The board, enclosure and J2 connector are the same for every vehicle. Only the T-harness changes. It plugs in between a module and its factory connector, so nothing in the car is cut or spliced, and unplugging it puts the car back to stock.
+canode lives at each vehicle's **CAN gateway**, as a man-in-the-middle on one bus: CAN1 faces the car, CAN2 faces the gateway. The board, the enclosure and a short pigtail (J2 to a universal 12-way Deutsch DTM connector) are the same for every vehicle. Only the T-harness changes: it plugs in between the gateway and its factory connector and branches off to the DTM. Nothing in the car is cut or spliced, nothing is written to any module, and unplugging the harness puts the car back to stock. Details: [`hardware/README.md`](hardware/README.md#harness-pigtail-and-t-harness).
 
-| Ford Bronco Sport (gateway module) | Chevrolet Silverado 3500 |
+| Ford Bronco Sport (GWM) | Chevrolet Silverado 3500 |
 |---|---|
 | ![Bronco Sport T-harness](hardware/docs/renders/canode_vehicle_ford.png) | ![Silverado T-harness](hardware/docs/renders/canode_vehicle_gm.png) |
 | **BMW F80 M3** | |
 | ![F80 T-harness](hardware/docs/renders/canode_vehicle_bmw.png) | |
 
-The housings in these renders are **representative**. Pin count, colour and lock style suggest each connector family, but they are not dimensioned copies of the OEM parts. Each real harness is built once the tap point (module and pins) has been confirmed on the car.
+The housings in these renders are **representative**. Pin count, colour and lock style suggest each connector family, but they are not dimensioned copies of the OEM parts. Each real harness is built once the gateway connector and the bus to intercept have been confirmed on the car.
 
 | T-harness wire | Goes to |
 |---|---|
-| Every pin except the CAN pair | straight through, factory connector ↔ module |
-| CAN H/L from the factory connector (car side) | J2 pin 2 CAN1_H, pin 6 CAN1_L |
-| CAN H/L into the module | J2 pin 3 CAN2_H, pin 7 CAN2_L |
-| The module's battery feed (or a fused tap) | J2 pin 1 +12 V |
-| The module's ground | J2 pin 5 GND |
-| Optional: ignition or accessory feed | J2 pin 4 AUX_IN |
+| Every pin except the intercepted CAN pair | straight through, factory connector ↔ gateway |
+| CAN H/L from the factory connector (car side) | J2 pin 2 CAN1_H, pin 8 CAN1_L |
+| CAN H/L into the gateway | J2 pin 3 CAN2_H, pin 9 CAN2_L |
+| The gateway's battery feed (or a fused tap) | J2 pin 1 +12 V |
+| The gateway's ground | J2 pin 7 GND |
+| Ignition or accessory feed, if the connector has one | J2 pin 5 IGN_IN |
+| ID resistor (one value per vehicle) | between J2 pin 11 HARNESS_ID and pin 12 GND |
 
 Notes:
 - **Ford Bronco Sport:** plug-in start-stop eliminators for this vehicle sit inline between the factory harness and the gateway module behind the OBD port under the steering column ([example install](https://www.4dtech.com/ford-bronco-sport-21-22-start-stop-eliminator)). That is a natural canode tap point too.
-- **Silverado and F80:** the common eliminators for these plug in behind the start-stop *switch*, which works at the button, not on CAN. For canode, the module to sit in front of is still to be picked.
+- **Silverado and F80:** canode goes at the CAN gateway here too, not at the start-stop switch where the common eliminators plug in. On GM Global A trucks the BCM usually does the gateway job, and on the F30/F80 family the central gateway is built into the FEM. Confirm both from service info.
+  - The Silverado's low-speed GMLAN is single-wire CAN, which canode's transceivers can't drive. Pick a two-wire bus to intercept.
+  - The F80's FlexRay and Ethernet are out of scope; its K-CAN and PT-CAN buses are fine.
+- **One bus at a time:** a central gateway has several bus pairs on its connector. canode intercepts one of them, so each T-harness picks the bus that carries the messages you want to change.
 - **Termination:** cutting a bus into two segments can leave one of them unterminated, for example when the module was an end node. Measure each segment (about 60 Ω is correct) and bridge JP1/JP2 only where a segment needs it.
 
-## Harness (J2, Molex Micro-Fit 3.0 2×4)
+## Harness connector (J2, Molex Micro-Fit 3.0 2×6)
 
 | Pin | Signal | Pin | Signal |
 |---|---|---|---|
-| 1 | +12 V (battery or switched) | 5 | GND |
-| 2 | CAN1_H | 6 | CAN1_L |
-| 3 | CAN2_H | 7 | CAN2_L |
-| 4 | AUX_IN (0–36 V sense) | 8 | AUX_OUT (low-side switch) |
+| 1 | +12 V (battery or switched) | 7 | GND |
+| 2 | CAN1_H (car side) | 8 | CAN1_L |
+| 3 | CAN2_H (module side) | 9 | CAN2_L |
+| 4 | AUX_IN (0–36 V sense) | 10 | AUX_OUT (low-side switch) |
+| 5 | IGN_IN (0–36 V sense: ignition / accessory feed) | 11 | HARNESS_ID (resistor to GND in the T-harness) |
+| 6 | AUX_IN2 (0–36 V sense) | 12 | GND (ID resistor return, shield drain) |
 
 Each H/L pair sits on adjacent pins across the two rows, so twisted pairs land cleanly. The pinout is also on the board's back silkscreen and engraved on the enclosure.
+
+**HARNESS_ID** lets the firmware tell which T-harness is plugged in. The board pulls the pin up to 3.3 V through 10 kΩ, and each T-harness puts its own resistor from pin 11 to pin 12. The ADC (PB12) then reads 3.3 V × R / (R + 10 k), so the firmware could pick that vehicle's profile automatically. That auto-selection isn't written yet; the read-only firmware doesn't use it. Suggested values, all E12 and well apart on the ADC: open = bench or no harness, 0 Ω = reserved, 1 k, 2.2 k, 4.7 k, 10 k, 22 k, 47 k.
+
+All three 0–36 V inputs (AUX_IN, IGN_IN, AUX_IN2) use the same 100k:10k divider and 100 nF filter as VBAT sense, so any vehicle voltage, including a 24 V jump start or a 35 V load dump, is safe on them. They read 12 V-active signals directly. A ground-switched signal needs a pull-up to 12 V in the T-harness.
 
 ## Quick start (macOS)
 
@@ -123,9 +133,10 @@ The full plan, with pass criteria, is in [`validation/README.md`](validation/REA
 | Check | Result |
 |---|---|
 | Netlist vs design table | ✅ 61 parts, 45 nets, 0 mismatches |
-| MCU pinout vs ST's pin data (UFQFPN-48) | ✅ 29/29 incl. exposed pad on GND |
+| MCU pinout vs ST's pin data (UFQFPN-48) | ✅ 32/32 incl. exposed pad on GND |
 | Schematic ERC | ✅ 0 errors |
 | DRC + schematic parity | ✅ 0 errors, parity clean |
+| Pad-by-pad net parity (board vs netlist) | ✅ 242/242 pads |
 | Footprint ↔ datasheet pinout | ✅ all match; J2's physical pin order still to confirm against the Molex drawing |
 | Reference-design comparison | ✅ crystal load caps corrected (30 → 20 pF) |
 | LCSC stock | ✅ out-of-stock MCU, TVS and LED replaced |

@@ -30,7 +30,7 @@ The goal is to catch as much as possible **before** ordering boards, then bring 
 | D4–D6 | LEDs | pad 1 = cathode | Polarity |
 | Y1 | X322512MSB4SI (3225) | 1/3 = crystal, 2/4 = GND | |
 | J1 | HRO TYPE-C-31-M-12 | A/B pin letters per the footprint | |
-| J2 | Molex 43045-0812 | pins 1–4 in row 1, 5–8 in row 2 | The harness depends on it |
+| J2 | Molex 43045-1212 | pins 1–6 in row 1, 7–12 in row 2 | The harness depends on it |
 
 ### Step 6: simulations worth running
 

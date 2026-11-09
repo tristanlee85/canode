@@ -1,5 +1,5 @@
 Designator,Value,MPN,Footprint
-J2,Micro-Fit 2x4,Molex 43045-0812,Connector_Molex:Molex_Micro-Fit_3.0_43045-0812_2x04_P3.00mm_Vertical
+J2,Micro-Fit 2x6,Molex 43045-1212,Connector_Molex:Molex_Micro-Fit_3.0_43045-1212_2x06_P3.00mm_Vertical
 J3,SWD,1x5 2.54mm header,Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical
 J4,UART,1x3 2.54mm header,Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical
 J5,GPIO,1x6 2.54mm header,Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical

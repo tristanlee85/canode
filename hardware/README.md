@@ -36,19 +36,22 @@ This is a 2-channel CAN interface board for in-vehicle sniffing and gatewaying. 
 - For true listen-only, use FDCAN *bus monitoring* mode, which sends no ACKs, with Rs low.
 
 **Sense and output.**
-- VBAT and AUX_IN each go to an ADC pin through a 100k:10k divider with a 100 nF filter. Full scale is about 36 V, about 9 mV per count.
+- VBAT, AUX_IN, IGN_IN and AUX_IN2 each go to an ADC pin through a 100k:10k divider with a 100 nF filter. Full scale is about 36 V, about 9 mV per count.
+- HARNESS_ID (J2 pin 11): 10 kΩ pull-up to 3.3 V, then 10 kΩ + 100 nF into the ADC. The T-harness puts an ID resistor from pin 11 to pin 12 (GND). A wiring fault that puts 12–36 V on the pin pushes at most ~3 mA into the pin's clamp and the 3.3 V rail through 10 kΩ.
 - AUX_OUT is a low-side AO3422 (55 V) switch with an SS36 (60 V) flyback diode to VBAT, through R18 (2.2 Ω), which keeps reverse-battery current out of Q1's body diode. It can drive a relay coil or an LED, or pull down a factory switch input.
 
 **Debug.** SWD header (J3), UART header (J4), 4 spare GPIO (J5), RESET and BOOT buttons, and power / two status LEDs.
 
-### J2: Molex Micro-Fit 3.0, 2×4 vertical (43045-0812)
+### J2: Molex Micro-Fit 3.0, 2×6 vertical (43045-1212)
 
 | Pin | Signal | Pin | Signal |
 |---|---|---|---|
-| 1 | +12 V (battery / switched) | 5 | GND |
-| 2 | CAN1_H | 6 | CAN1_L |
-| 3 | CAN2_H | 7 | CAN2_L |
-| 4 | AUX_IN (0–36 V sense) | 8 | AUX_OUT (low-side switch) |
+| 1 | +12 V (battery or switched) | 7 | GND |
+| 2 | CAN1_H (car side) | 8 | CAN1_L |
+| 3 | CAN2_H (module side) | 9 | CAN2_L |
+| 4 | AUX_IN (0–36 V sense) | 10 | AUX_OUT (low-side switch) |
+| 5 | IGN_IN (0–36 V sense: ignition / accessory feed) | 11 | HARNESS_ID (resistor to GND in the T-harness) |
+| 6 | AUX_IN2 (0–36 V sense) | 12 | GND (ID resistor return, shield drain) |
 
 H/L pairs are stacked across the two rows, so each twisted pair lands on adjacent pins. The pinout is also printed on the back silkscreen.
 
@@ -64,11 +67,34 @@ H/L pairs are stacked across the two rows, so each twisted pair lands on adjacen
 | HSE | PF0 / PF1 | 12 MHz, 20 pF load caps |
 | VBAT sense | PA0 (ADC IN0) | V = adc × 3.3/4096 × 11 |
 | AUX_IN sense | PA1 (ADC IN1) | same divider |
+| IGN_IN sense | PB10 (ADC IN11) | same divider |
+| AUX_IN2 sense | PB11 (ADC IN15) | same divider |
+| HARNESS_ID | PB12 (ADC IN16) | 10k pull-up; V = 3.3 × R / (R + 10k) |
 | AUX_OUT gate | PA8 | TIM1_CH1 if you want PWM |
 | LED1 / LED2 | PA5 / PA6 | active high |
 | Debug UART | PA2 TX / PA3 RX | USART2 |
 | Spare GPIO | PB6, PB7, PB8, PB9 | PB6/PB7 = I2C1 or USART1 |
 | SWD | PA13 SWDIO / PA14 SWCLK | PA14 is also BOOT0 |
+
+## Harness: pigtail and T-harness
+
+canode never plugs straight into a car. Three pieces sit between them, so one board serves every vehicle:
+
+```
+canode J2 ──pigtail (~20 cm)──▶ universal inline connector ◀── per-vehicle T-harness ──▶ factory connector ⇄ CAN gateway
+ (Micro-Fit 2×6)                 (12-way, sealed)               (made once per vehicle)
+```
+
+1. **Pigtail (the same for every car).** It runs from a Micro-Fit 43025-1200 housing on J2 to the universal connector, wired pin for pin (J2 pin n = universal pin n). Use 20–22 AWG automotive wire (TXL/GXL), and twist each CAN pair (2/8 and 3/9) at about 30–40 twists per metre.
+2. **Universal inline connector.** The suggested part is a **Deutsch DTM 12-way** pair: sealed, cheap, and stocked everywhere. The pigtail end is a DTM04-12PA receptacle with pin contacts and a WM-12P wedge. The T-harness end is a DTM06-12SA plug with socket contacts and a WM-12S wedge. Contacts are size 20, crimped with the matching tool. Confirm the part numbers against the TE/Deutsch catalogue before ordering. This uses the usual automotive convention: the side that carries battery power (the T-harness) gets the **sockets**, so no live pin is exposed when it's unplugged. canode's side has no power on its pins when unplugged.
+3. **T-harness (one per vehicle).** It has an inline male/female pair matching the factory connector at that vehicle's CAN gateway, plus the DTM06 branch:
+   - every factory pin passes straight through, except the one CAN pair being intercepted;
+   - the car side of that pair goes to pins 2/8 (CAN1) and the gateway side to pins 3/9 (CAN2);
+   - +12 V comes from the gateway's battery feed, through an inline 2 A fuse close to the tap, to pin 1, and its ground goes to pin 7;
+   - an ignition or accessory feed, if the connector has one, goes to pin 5;
+   - the harness's ID resistor sits between pins 11 and 12, inside the DTM06 boot.
+
+Which bus, which pins and which connector to use are per-vehicle research (service-info pinouts plus a sniff on the car). Record each finished harness in `hardware/harness/<vehicle>.md` with its connector part numbers, pin table and ID resistor value.
 
 ## Ordering at JLCPCB
 
@@ -94,7 +120,7 @@ H/L pairs are stacked across the two rows, so each twisted pair lands on adjacen
 
    You can rotate parts right in the preview, and JLC's DFM engineers also check.
 6. **Order the hand-solder parts separately** (Digi-Key / Mouser / LCSC):
-   - Molex **43045-0812**, plus mating housing 43025-0800 and crimp terminals 43030-0001 (or a pre-crimped Micro-Fit pigtail).
+   - Molex **43045-1212**, plus mating housing 43025-1200 and crimp terminals 43030-0001 for the pigtail (see [Harness](#harness-pigtail-and-t-harness)).
    - Straight 2.54 mm headers: 1×5, 1×3 and 1×6.
 
 Ballpark cost: about $2 for the PCBs, plus Economic PCBA setup (about $8 + stencil). Expect 8 extended-part fees at $3 each (per `validation/reports/2026-11-09_lcsc.md`) on top of parts. That comes to something like $40–60 for 2 assembled boards before shipping; JLC's quote is the real number.

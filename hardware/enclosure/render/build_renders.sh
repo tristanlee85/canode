@@ -30,8 +30,8 @@ if [ ! -x "$EPY" ]; then
 fi
 
 # 1. stand-in models for parts KiCad's 3D library lacks (J1, J2, SW1/2, mating plug)
-for m in Molex_Micro-Fit_3.0_43045-0812_2x04_P3.00mm_Vertical USB_C_Receptacle_HRO_TYPE-C-31-M-12 \
-         SW_Push_1P1T_XKB_TS-1187A Molex_Micro-Fit_3.0_43025-0800_plug_mated; do
+for m in Molex_Micro-Fit_3.0_43045-1212_2x06_P3.00mm_Vertical USB_C_Receptacle_HRO_TYPE-C-31-M-12 \
+         SW_Push_1P1T_XKB_TS-1187A Molex_Micro-Fit_3.0_43025-1200_plug_mated; do
   [ -f "hardware/3dmodels/$m.step" ] || { "$EPY" hardware/3dmodels/make_models.py; break; }
 done
 

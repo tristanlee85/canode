@@ -5,15 +5,15 @@ kicad-packages3D library does not ship (checked against gitlab master and all
 release tags, Nov 2026):
 
   J1      USB_C_Receptacle_HRO_TYPE-C-31-M-12
-  J2      Molex_Micro-Fit_3.0_43045-0812_2x04_P3.00mm_Vertical
+  J2      Molex_Micro-Fit_3.0_43045-1212_2x06_P3.00mm_Vertical
   SW1/2   SW_Push_1P1T_XKB_TS-1187A
 
 These are envelope-accurate stand-ins (outline, height, pin positions from the
 footprints and the datasheets), good for 3D viewing, renders and enclosure
 fit checks. They are not manufacturer models.
 
-Also written: the mating Micro-Fit plug (43025-0800 housing), positioned as
-mated on the 43045-0812 footprint. It is used only by the enclosure renders.
+Also written: the mating Micro-Fit plug (43025-1200 housing), positioned as
+mated on the 43045-1212 footprint. It is used only by the enclosure renders.
 
 Coordinates follow KiCad's 3D-model convention: origin = footprint origin,
 X = footprint X, Y = -(footprint Y), Z up from the board's top surface, mm.
@@ -58,16 +58,19 @@ def save(parts, name):
 
 
 # --------------------------------------------------------------------------
-# J2: Molex Micro-Fit 3.0 43045-0812, 2x4 vertical header
+# J2: Molex Micro-Fit 3.0 43045-1212, 2x6 vertical header
 # Footprint: pad 1 at origin, pitch 3.00 along +X, second row at +3.00 Y.
-# Body (F.Fab) X -3.575..12.575, Y -2.47..4.90, latch ramp at Y 4.9..6.3.
+# Body (F.Fab) X -3.575..18.575, Y -2.47..4.90, latch ramp at Y 4.9..6.3.
 # Height above PCB 9.91 mm (Molex), mated height 17.27 mm.
 # --------------------------------------------------------------------------
+MF_N = 6                            # circuits per row
+MF_SPAN = 3.0 * (MF_N - 1)          # pad 1 to last pad in a row
+MF_MID = MF_SPAN / 2                # latch sits mid-length
 MF_H = 9.91
-MF_X0, MF_X1 = -3.575, 12.575
+MF_X0, MF_X1 = -3.575, MF_SPAN + 3.575
 MF_Y0, MF_Y1 = -2.47, 4.90
 MF_FLOOR = 3.0                      # top of the cavity floor
-MF_IN_X0, MF_IN_X1 = -2.05, 11.05    # cavity (plug body fits here)
+MF_IN_X0, MF_IN_X1 = -2.05, MF_SPAN + 2.05    # cavity (plug body fits here)
 MF_IN_Y0, MF_IN_Y1 = -1.45, 4.25
 
 
@@ -81,41 +84,42 @@ def microfit_header():
     body = box_fp(MF_X0, MF_X1, MF_Y0, MF_Y1, 0, MF_H)
     body -= box_fp(MF_IN_X0, MF_IN_X1, MF_IN_Y0, MF_IN_Y1, MF_FLOOR, MF_H + 1)
     # latch window in the latch-side wall and the external latch ramp
-    body -= box_fp(3.6, 5.4, MF_IN_Y1 - 0.1, MF_Y1 + 0.1, 5.2, 7.6)
-    body += box_fp(3.8, 5.2, MF_Y1, 6.3, 5.0, 7.4)
+    body -= box_fp(MF_MID - 0.9, MF_MID + 0.9, MF_IN_Y1 - 0.1, MF_Y1 + 0.1, 5.2, 7.6)
+    body += box_fp(MF_MID - 0.7, MF_MID + 0.7, MF_Y1, 6.3, 5.0, 7.4)
     # stand-off feet / chamfered corners on the far side
     body -= box_fp(-0.5, 0.5, MF_Y0 - 0.1, -1.97, 0, 1.0)
     # polarizing ribs inside the cavity (keyed positions)
-    for x in (1.5, 7.5):
+    for x in (1.5, MF_SPAN - 1.5):
         body += box_fp(x - 0.4, x + 0.4, MF_IN_Y0, MF_IN_Y0 + 0.5, MF_FLOOR, MF_H - 0.6)
     housing = colored(body, NYLON_BLACK, "housing")
 
     pins = []
-    for i in range(4):
+    for i in range(MF_N):
         for row in (0, 3):
             x = 3.0 * i
             pins.append(fp(x, row, -3.0) * Box(0.64, 0.64, MF_FLOOR + 5.2 + 3.0, align=C))
-    pegs = [fp(x, 3.94, -2.4) * Cylinder(0.5, 2.4 + 0.1, align=C) for x in (-3, 12)]
+    pegs = [fp(x, 3.94, -2.4) * Cylinder(0.5, 2.4 + 0.1, align=C) for x in (-3, MF_SPAN + 3)]
     return [housing,
             colored(Compound(pins), TIN, "pins"),
             colored(Compound(pegs), NYLON_BLACK, "pegs")]
 
 
 def microfit_plug():
-    """43025-0800 receptacle housing, mated, plus the start of the wire seals."""
+    """43025-1200 receptacle housing, mated, plus the start of the wire seals."""
     z0, z1 = MF_FLOOR + 0.2, 17.27
     body = box_fp(MF_IN_X0 + 0.15, MF_IN_X1 - 0.15, MF_IN_Y0 + 0.12, MF_IN_Y1 - 0.12, z0, z1)
     # wire entry holes on top
-    for i in range(4):
+    for i in range(MF_N):
         for row in (0, 3):
             body -= fp(3.0 * i, row, z1 - 2.0) * Cylinder(0.95, 2.5, align=C)
     # latch: cantilever outside the shroud, hinge bridge, hook and thumb pad
-    body += box_fp(3.3, 5.7, MF_IN_Y1 - 0.2, 6.9, 12.0, 13.6)     # bridge
-    body += box_fp(3.3, 5.7, 6.4, 7.2, 5.2, 16.6)                 # arm
-    body += box_fp(3.3, 5.7, 6.0, 6.4, 5.2, 6.8)                  # hook
-    body += box_fp(2.8, 6.2, 6.6, 8.1, 15.2, 16.8)                # thumb pad
-    for zz in (15.5, 16.1):                                        # grip ribs
-        body += box_fp(2.8, 6.2, 8.1, 8.4, zz, zz + 0.3)
+    m = MF_MID
+    body += box_fp(m - 1.2, m + 1.2, MF_IN_Y1 - 0.2, 6.9, 12.0, 13.6)     # bridge
+    body += box_fp(m - 1.2, m + 1.2, 6.4, 7.2, 5.2, 16.6)                 # arm
+    body += box_fp(m - 1.2, m + 1.2, 6.0, 6.4, 5.2, 6.8)                  # hook
+    body += box_fp(m - 1.7, m + 1.7, 6.6, 8.1, 15.2, 16.8)                # thumb pad
+    for zz in (15.5, 16.1):                                                # grip ribs
+        body += box_fp(m - 1.7, m + 1.7, 8.1, 8.4, zz, zz + 0.3)
     return [colored(body, NYLON_BLACK, "plug_housing")]
 
 
@@ -170,7 +174,7 @@ def tact():
 
 
 if __name__ == "__main__":
-    save(microfit_header(), "Molex_Micro-Fit_3.0_43045-0812_2x04_P3.00mm_Vertical")
-    save(microfit_plug(), "Molex_Micro-Fit_3.0_43025-0800_plug_mated")
+    save(microfit_header(), "Molex_Micro-Fit_3.0_43045-1212_2x06_P3.00mm_Vertical")
+    save(microfit_plug(), "Molex_Micro-Fit_3.0_43025-1200_plug_mated")
     save(usb_c(), "USB_C_Receptacle_HRO_TYPE-C-31-M-12")
     save(tact(), "SW_Push_1P1T_XKB_TS-1187A")

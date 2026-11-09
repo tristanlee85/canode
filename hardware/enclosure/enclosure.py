@@ -38,8 +38,8 @@ BOARD_R = 2.0
 PCB_T = 1.6
 H1 = (103.5, -103.5)                                    # M3 mounting holes
 H2 = (181.5, -146.5)
-J2_PINS_X = (107.5, 110.5)                              # Micro-Fit rows (pin 5-8, pin 1-4)
-J2_Y = (-114.0, -123.0)                                 # pin 1 .. pin 4 (3.00 pitch)
+J2_PINS_X = (107.5, 110.5)                              # Micro-Fit rows (pin 7-12, pin 1-6)
+J2_Y = (-114.0, -129.0)                                 # pin 1 .. pin 6 (3.00 pitch)
 J2_HEADER_TOP = PCB_T + 9.91                            # Molex 43045 height
 USB_Y, USB_ZC = -125.0, PCB_T + 1.63                    # J1 centre line (HRO shell 3.26 tall)
 LEDS = {"D4": (153.5, -103.0), "D5": (161.5, -103.0), "D6": (161.5, -105.5)}
@@ -82,7 +82,7 @@ USB_W, USB_H, USB_R = 13.2, 7.4, 3.0
 
 # J2 harness opening in the lid: header footprint + plug latch + finger room
 J2_OPEN_X = (IX0, 114.0)
-J2_OPEN_Y = (-127.8, -109.2)
+J2_OPEN_Y = (-133.8, -109.2)
 
 LED_BORE = 1.5         # 1.0 mm wall between D5/D6 (JLC MJF: >1.0 mm walls); optional 1.0 mm PMMA fibre light pipe
 LED_TUBE_BOTTOM = PCB_T + 1.4
@@ -145,7 +145,7 @@ def make_base():
                    (181.0, -125.0),                         # under USB-C (between shield legs)
                    SW["SW1"], SW["SW2"]):                   # under the poke buttons
         shell += cyl(x, y, Z_FLOOR - 0.01, 0, 3.0)
-    shell += box(101.0, 103.0, -127.0, -110.0, Z_FLOOR - 0.01, 0)   # J2 mating force
+    shell += box(101.0, 103.0, -133.0, -110.0, Z_FLOOR - 0.01, 0)   # J2 mating force
     shell += box(121.0, 166.0, -149.6, -148.4, Z_FLOOR - 0.01, 0)   # J3-J5 mating force
     # keep the cavity clean: re-cut anything that grew into the wall clearance above the PCB
     for (x, y) in (H1, H2):
@@ -156,9 +156,10 @@ def make_base():
         RectangleRounded(USB_H, USB_W, USB_R), amount=10, both=True)
 
     # bottom label (engraved): pinout for the installer
-    lbl = [("canode rev A", 4.0, CX, CY + 15), ("J2: 1 +12V  2 CAN1H  3 CAN2H  4 AUX IN", 2.6, CX, CY + 4),
-           ("5 GND  6 CAN1L  7 CAN2L  8 AUX OUT", 2.6, CX, CY - 1.5),
-           ("Micro-Fit 3.0  43025-0800", 2.6, CX, CY - 7)]
+    lbl = [("canode rev A", 4.0, CX, CY + 16),
+           ("J2: 1 +12V  2 CAN1H  3 CAN2H  4 AUX IN  5 IGN  6 AUX2", 2.4, CX, CY + 6),
+           ("7 GND  8 CAN1L  9 CAN2L  10 AUX OUT  11 ID  12 GND", 2.4, CX, CY + 1),
+           ("Micro-Fit 3.0  43025-1200", 2.4, CX, CY - 5)]
     for s, size, x, y in lbl:
         try:
             t = Text(s, font_size=size, font=FONT)
@@ -211,8 +212,8 @@ def make_lid():
 
     # engraving
     cuts = [
-        text("canode", 7.5, 145.0, -126.0),
-        text("dual CAN", 2.6, 145.0, -132.5, style=FontStyle.REGULAR),
+        text("canode", 7.5, 149.0, -126.0),
+        text("dual CAN", 2.6, 149.0, -132.5, style=FontStyle.REGULAR),
         text("PWR", 2.2, LEDS["D4"][0], -108.8),
         text("1", 2.2, 164.6, -103.0),
         text("2", 2.2, 164.6, -105.5),
@@ -220,8 +221,8 @@ def make_lid():
         text("BOOT", 2.2, SW["SW2"][0], -139.6),
         text("USB", 2.2, 181.0, -117.0),
     ]
-    # J2 legend, one row per pin pair, left column = pins 5-8, right column = pins 1-4
-    rows = [("GND", "+12V"), ("CAN1 L", "H"), ("CAN2 L", "H"), ("AUX OUT", "IN")]
+    # J2 legend, one row per pin pair, left column = pins 7-12, right column = pins 1-6
+    rows = [("GND", "+12V"), ("CAN1 L", "H"), ("CAN2 L", "H"), ("AUX OUT", "IN"), ("ID", "IGN"), ("GND", "AUX2")]
     for i, (a, b) in enumerate(rows):
         y = J2_Y[0] - 3.0 * i
         cuts.append(text(f"{a} | {b}", 2.0, 124.0, y))
@@ -236,7 +237,7 @@ def interference_report(parts):
         print(f"--check: {BOARD_STEP} missing; run render/build_renders.sh first")
         return 1
     board = import_step(str(BOARD_STEP))
-    plug_path = ROOT / "hardware" / "3dmodels" / "Molex_Micro-Fit_3.0_43025-0800_plug_mated.step"
+    plug_path = ROOT / "hardware" / "3dmodels" / "Molex_Micro-Fit_3.0_43025-1200_plug_mated.step"
     plug = Pos(110.5, -114.0, PCB_T) * Rot(0, 0, -90) * import_step(str(plug_path))
     solids = list(board.solids()) + list(plug.solids())
     print(f"--check: {len(solids)} board/plug solids vs enclosure")
@@ -280,7 +281,7 @@ def main():
     export_stl(base, RENDER_OUT / "base.stl", tolerance=0.01, angular_tolerance=0.1)
     export_stl(lid, RENDER_OUT / "lid.stl", tolerance=0.01, angular_tolerance=0.1)
     plug = import_step(str(ROOT / "hardware" / "3dmodels" /
-                           "Molex_Micro-Fit_3.0_43025-0800_plug_mated.step"))
+                           "Molex_Micro-Fit_3.0_43025-1200_plug_mated.step"))
     plug = Pos(110.5, -114.0, PCB_T) * Rot(0, 0, -90) * plug
     export_stl(plug, RENDER_OUT / "plug.stl", tolerance=0.01, angular_tolerance=0.1)
 

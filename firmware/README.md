@@ -40,13 +40,16 @@ The ROM bootloader (blank chip, or the `dfu` command) probes FDCAN1 on PD0/PD1. 
 | HSE | PF0 / PF1 | 12 MHz crystal |
 | VBAT sense | PA0 | ADC1_IN0, V = raw × 3.3 / 4095 × 11 |
 | AUX_IN sense | PA1 | ADC1_IN1, same scaling |
+| IGN_IN sense | PB10 | ADC1_IN11, same scaling (J2 pin 5) |
+| AUX_IN2 sense | PB11 | ADC1_IN15, same scaling (J2 pin 6) |
+| HARNESS_ID | PB12 | ADC1_IN16; 10k pull-up, harness resistor R to GND: V = 3.3 × R / (R + 10k) (J2 pin 11) |
 | AUX_OUT gate | PA8 | GPIO or TIM1_CH1 (AF2) |
 | LED1 / LED2 | PA5 / PA6 | GPIO, active high |
 | Debug UART | PA2 TX / PA3 RX | USART2 (AF1) |
 | Spare | PB6 / PB7 / PB8 / PB9 | PB6/PB7 = I2C1 (AF6) or USART1 |
 | SWD | PA13 / PA14 | default after reset; PA14 is also BOOT0 |
 
-Board differences live in `src/board.h`. The firmware does not use VBAT, AUX_IN or AUX_OUT yet.
+Board differences live in `src/board.h`. The firmware does not use VBAT, AUX_IN, IGN_IN, AUX_IN2, HARNESS_ID or AUX_OUT yet.
 
 ## Clock plan
 ```
