@@ -1,0 +1,17 @@
+# KiCad
+*-backups/
+*.kicad_prl
+fp-info-cache
+_autosave-*
+*.lck
+~*.lck
+\#auto_saved_files#
+hardware/kicad/*.net
+# build / caches
+build/
+validation/.cache/
+tools/freerouting/*.jar
+__pycache__/
+*.pyc
+.venv/
+.DS_Store

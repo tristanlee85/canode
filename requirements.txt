@@ -1,0 +1,4 @@
+pyserial>=3.5        # tools/canlog (OBDLink / STN adapters)
+python-can>=4.3      # bench CAN tests (CANable / candleLight / slcan)
+pyocd>=0.36          # SWD flash + debug via ST-Link
+cairosvg>=2.7        # PCB renders (hardware/generator/render.py)

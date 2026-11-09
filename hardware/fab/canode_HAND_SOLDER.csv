@@ -1,0 +1,5 @@
+Designator,Part,Notes
+J2,Molex 43045-0812,Vehicle harness connector (hand-solder THT)
+J3,1x5 2.54mm header,SWD: 3V3 SWCLK GND SWDIO NRST
+J4,1x3 2.54mm header,Debug UART (USART2): GND TX RX
+J5,1x6 2.54mm header,Spare GPIO (PB6/PB7 = I2C1 or USART1)
