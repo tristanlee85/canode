@@ -22,6 +22,9 @@ NAMES = {
     "enclosure_exploded.png": "canode_enclosure_exploded.png",
     "enclosure_open.png": "canode_enclosure_open.png",
     "enclosure_top.png": "canode_enclosure_top_scale.png",
+    "vehicle_ford.png": "canode_vehicle_ford.png",
+    "vehicle_gm.png": "canode_vehicle_gm.png",
+    "vehicle_bmw.png": "canode_vehicle_bmw.png",
 }
 
 

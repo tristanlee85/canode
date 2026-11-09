@@ -213,8 +213,9 @@ def curve_obj(name, pts, radius, mat, res=24):
     return o
 
 
-def harness(lift=0.0):
-    """Eight wires out of the Micro-Fit plug, gathered into a loom heading off to -X."""
+def harness(lift=0.0, loom=None):
+    """Eight wires out of the Micro-Fit plug, gathered into a loom heading off to -X.
+    loom: optional list of extra (x, y, z) mm points the loom follows after the default start."""
     objs = []
     cx, cy = 109.0, -118.5
     for i, (x, y) in enumerate(J2_PINS):
@@ -225,9 +226,13 @@ def harness(lift=0.0):
         pts = [v(x, y, z0), v(x, y, z0 + 7), v(cx + dx * 0.55, cy + dy * 0.55, z0 + 17),
                v(cx - 12 + dx * 0.35, cy + dy * 0.35, z0 + 26), v(cx - 24 + dx * 0.3, cy + dy * 0.3, z0 + 29)]
         objs.append(curve_obj(f"wire{i + 1}", pts, 0.8 * MM, m))
-    loom = [v(cx - 21, cy, PLUG_TOP + 28.6 + lift), v(cx - 45, cy + 3, PLUG_TOP + 31 + lift),
-            v(cx - 85, cy + 14, PLUG_TOP + 27 + lift), v(cx - 140, cy + 30, PLUG_TOP + 18 + lift)]
-    objs.append(curve_obj("loom", loom, 4.2 * MM, mats()["sleeve"]))
+    if loom is None:
+        pts = [v(cx - 21, cy, PLUG_TOP + 28.6 + lift), v(cx - 45, cy + 3, PLUG_TOP + 31 + lift),
+               v(cx - 85, cy + 14, PLUG_TOP + 27 + lift), v(cx - 140, cy + 30, PLUG_TOP + 18 + lift)]
+    else:
+        pts = [v(cx - 21, cy, PLUG_TOP + 28.6 + lift), v(cx - 40, cy + 2, PLUG_TOP + 29 + lift)] + \
+              [v(*p) for p in loom]
+    objs.append(curve_obj("loom", pts, 4.2 * MM, mats()["sleeve"]))
     return objs
 
 
@@ -367,6 +372,164 @@ def ruler(x0, y0, length=150):
     lab.data.materials.append(mats()["ink"])
     bpy.context.scene.collection.objects.link(lab)
     return objs + [ticks, lab]
+
+
+# ----------------------------------------------------------------------------- per-vehicle T-harness
+# Representative housings only: pin count, colour and lock style suggest each vehicle's
+# connector family, they are not dimensioned copies of the OEM parts. The real connector is
+# picked per vehicle once the tap point (module and pins) is confirmed on the car.
+VEHICLES = {
+    "ford": dict(title="Ford Bronco Sport: inline at the gateway module (GWM)",
+                 rows=2, cols=12, pitch=2.8, body=(0.014, 0.014, 0.015), lock="lever",
+                 lock_col=(0.30, 0.31, 0.33), module="GWM"),
+    "gm": dict(title="Chevrolet Silverado 3500: inline at a body-network module",
+               rows=2, cols=8, pitch=3.5, body=(0.40, 0.41, 0.43), lock="cpa",
+               lock_col=(0.80, 0.10, 0.05), module="MODULE"),
+    "bmw": dict(title="BMW F80 M3: inline at a body-network module",
+                rows=3, cols=9, pitch=2.5, body=(0.014, 0.014, 0.015), lock="slider",
+                lock_col=(0.42, 0.20, 0.55), module="MODULE"),
+}
+
+
+class Frame:
+    """Local placement: origin (mm) plus a rotation about Z in degrees (multiples of 90)."""
+
+    def __init__(self, x, y, z, deg):
+        self.x, self.y, self.z, self.deg = x, y, z, deg
+
+    def p(self, lx, ly, lz):
+        a = math.radians(self.deg)
+        c, s = math.cos(a), math.sin(a)
+        return (self.x + lx * c - ly * s, self.y + lx * s + ly * c, self.z + lz)
+
+    def box(self, name, size, local, mat, bevel=0.3):
+        sx, sy, sz = size
+        if self.deg % 180:
+            sx, sy = sy, sx
+        return rounded_box(name, (sx * MM, sy * MM, sz * MM), bevel * MM, mat, v(*self.p(*local)))
+
+
+def conn_size(spec):
+    return spec["cols"] * spec["pitch"] + 5.0, spec["rows"] * spec["pitch"] + 5.0   # W, H
+
+
+def oem_connector(name, fr, spec, gender, body_mat, lock_mat, D=20.0):
+    """Mating face at local x=0 facing +X, body toward -X, cable boot behind it.
+    gender 'f' = harness receptacle (terminal cavities, lock); 'm' = inline header (shroud, pins).
+    Returns (objects, rear cable exit point in mm)."""
+    r, c, p = spec["rows"], spec["cols"], spec["pitch"]
+    W, H = conn_size(spec)
+    dark = mats()["black_epoxy"]
+    objs = []
+    grid = [((j - (c - 1) / 2) * p, (i - (r - 1) / 2) * p) for i in range(r) for j in range(c)]
+    if gender == "f":
+        objs.append(fr.box(f"{name}_body", (D, W, H), (-D / 2, 0, 0), body_mat, 1.0))
+        for k, (ly, lz) in enumerate(grid):
+            objs.append(fr.box(f"{name}_cav{k}", (0.3, p * 0.55, p * 0.55), (0.06, ly, lz), dark, 0.05))
+        if spec["lock"] == "lever":
+            for sgn in (-1, 1):
+                objs.append(fr.box(f"{name}_lever{sgn}", (9, 1.2, H * 0.9), (-D * 0.45, sgn * (W / 2 + 0.7), 0),
+                                   lock_mat, 0.4))
+            objs.append(fr.box(f"{name}_leverbar", (3.5, W + 2.6, 1.6), (-D * 0.45 - 3, 0, H / 2 + 0.9),
+                               lock_mat, 0.5))
+        elif spec["lock"] == "cpa":
+            objs.append(fr.box(f"{name}_latch", (7, 7, 2.0), (-4.5, 0, H / 2 + 0.9), body_mat, 0.4))
+            objs.append(fr.box(f"{name}_cpa", (4, 4.5, 1.6), (-10, 0, H / 2 + 1.0), lock_mat, 0.4))
+        else:
+            objs.append(fr.box(f"{name}_slider", (D * 0.6, W * 0.8, 1.3), (-D * 0.55, 0, H / 2 + 0.55),
+                               lock_mat, 0.4))
+    else:
+        S, t = 9.0, 1.2
+        Wo, Ho = W + 2 * t + 0.6, H + 2 * t + 0.6          # shroud fits over the receptacle
+        objs.append(fr.box(f"{name}_body", (D - S, Wo, Ho), (-(D + S) / 2, 0, 0), body_mat, 1.0))
+        for sgn in (-1, 1):
+            objs.append(fr.box(f"{name}_wz{sgn}", (S, Wo, t), (-S / 2, 0, sgn * (Ho - t) / 2), body_mat, 0.3))
+            objs.append(fr.box(f"{name}_wy{sgn}", (S, t, Ho - 2 * t), (-S / 2, sgn * (Wo - t) / 2, 0),
+                               body_mat, 0.3))
+        objs.append(fr.box(f"{name}_floor", (0.3, Wo - 2 * t, Ho - 2 * t), (-S + 0.1, 0, 0), dark, 0.05))
+        for k, (ly, lz) in enumerate(grid):
+            objs.append(fr.box(f"{name}_pin{k}", (S - 2.2, 0.64, 0.64), (-S + (S - 2.2) / 2, ly, lz),
+                               mats()["tin"], 0.1))
+        objs.append(fr.box(f"{name}_ramp", (3, 6, 1.0), (-2.5, 0, Ho / 2 + 0.4), body_mat, 0.3))
+        W, H = Wo, Ho
+    objs.append(fr.box(f"{name}_boot", (9, W * 0.62, H * 0.75), (-D - 4, 0, 0), mats()["pvc_black"],
+                       min(W, H) * 0.3))
+    return objs, fr.p(-D - 8.5, 0, 0)
+
+
+def module_box(name, fr, spec, label):
+    """A control module seen from its connector side: header face at local x=0 facing +X."""
+    W, H = conn_size(spec)
+    body = principled("module", (0.018, 0.018, 0.02), rough=0.55)
+    objs = [fr.box(f"{name}_body", (42, 74, 30), (-21, 0, 0), body, 1.5)]
+    t = 1.6
+    for sgn in (-1, 1):   # header shroud the receptacle sits in
+        objs.append(fr.box(f"{name}_sz{sgn}", (6, W + 2 * t + 1, t), (3, 0, sgn * (H / 2 + 0.5 + t / 2)), body, 0.3))
+        objs.append(fr.box(f"{name}_sy{sgn}", (6, t, H + 1), (3, sgn * (W / 2 + 0.5 + t / 2), 0), body, 0.3))
+    objs.append(fr.box(f"{name}_label", (24, 40, 0.2), (-22, 0, 15.05),
+                       principled("label", (0.86, 0.86, 0.84), rough=0.6), 0.05))
+    txt = floor_text(f"{name}_txt", label, fr.p(-22, 0, 15.2), 5.0)
+    return objs + [txt]
+
+
+def floor_text(name, body, at_mm, size_mm, rot=0.0, mat=None):
+    cu = bpy.data.curves.new(name, "FONT")
+    cu.body = body
+    cu.size = size_mm * MM
+    cu.align_x = "CENTER"
+    cu.align_y = "CENTER"
+    o = bpy.data.objects.new(name, cu)
+    o.location = v(*at_mm)
+    o.rotation_euler = (0, 0, math.radians(rot))
+    o.data.materials.append(mat or mats()["ink"])
+    bpy.context.scene.collection.objects.link(o)
+    return o
+
+
+def vehicle_harness(veh):
+    """canode's J2 loom running to a T-harness that sits between a module and its factory
+    connector. CAN H/L from the factory side go to CAN1, the module side's to CAN2; every
+    other pin passes straight through; +12 V and GND are taken from the same connector."""
+    spec = VEHICLES[veh]
+    body = principled(f"{veh} housing", spec["body"], rough=0.45)
+    lock = principled(f"{veh} lock", spec["lock_col"], rough=0.4)
+    W, H = conn_size(spec)
+    fl = Z_BOT
+    X0 = -25.0
+    zc_mod = fl + 15.0
+    objs = []
+    # module, with the adapter's receptacle plugged into its header
+    objs += module_box("module", Frame(X0, -182.0, zc_mod, 90), spec, spec["module"])
+    o, rear_m = oem_connector("adapter_mod", Frame(X0, -182.0, zc_mod, -90), spec, "f", body, lock)
+    objs += o
+    # adapter's inline header that the factory connector plugs into
+    zc_hdr = fl + H / 2 + 2.6
+    o, rear_h = oem_connector("adapter_hdr", Frame(X0, -62.0, zc_hdr, 90), spec, "m", body, lock)
+    objs += o
+    # factory connector, unplugged from the module and pulled back from the adapter
+    o, rear_f = oem_connector("factory", Frame(X0, -46.0, zc_hdr, -90), spec, "f", body, lock)
+    objs += o
+    # splice (heat-shrink) where canode's loom joins the two legs
+    sp = (X0, -118.0, fl + 5.0)
+    objs.append(rounded_box("splice", (11 * MM, 26 * MM, 10 * MM), 4.5 * MM, mats()["pvc_black"], v(*sp)))
+    leg = mats()["sleeve"]
+    objs.append(curve_obj("leg_hdr", [v(*rear_h), v(rear_h[0], rear_h[1] - 8, fl + 5.5),
+                                      v(sp[0], sp[1] + 13, sp[2])], 3.0 * MM, leg))
+    objs.append(curve_obj("leg_mod", [v(*rear_m), v(rear_m[0], rear_m[1] + 9, fl + 9),
+                                      v(sp[0], sp[1] - 13, sp[2])], 3.0 * MM, leg))
+    factory_loom = curve_obj("factory_loom", [v(*rear_f), v(rear_f[0], rear_f[1] + 16, fl + 7),
+                                              v(X0 - 30, 18, fl + 6.5), v(X0 - 120, 50, fl + 6.5), v(X0 - 260, 90, fl + 6.5)],
+                             5.0 * MM, mats()["pvc_black"])
+    # canode's J2 loom: up out of the plug, then down to the floor and into the splice
+    loom = [(60.0, -116.0, 30.0), (30.0, -117.0, fl + 7.0), (X0 + 5.5, sp[1], sp[2])]
+    objs += harness(loom=loom)
+    # labels on the floor
+    objs.append(floor_text("lbl_factory", "factory connector", (X0 + 48, -40, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_header", "adapter", (X0 + 34, -76, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_adapter", "per-vehicle T-harness", (X0 + 62, -136, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_module", "adapter into module", (X0 + 80, -186, fl + 0.05), 7.0))
+    objs.append(floor_text("lbl_title", spec["title"], (60, -236, fl + 0.05), 7.5))
+    return objs, factory_loom
 
 
 # ----------------------------------------------------------------------------- stage
@@ -601,8 +764,29 @@ def sc_enc_top(out, samples):
     render(out / "enclosure_top.png", samples=samples)
 
 
+def sc_vehicle(veh):
+    def run(out, samples):
+        reset()
+        import_board()
+        set_leds({"D4": True, "D5": True})
+        import_stl("base", mats()["mjf"])
+        import_stl("lid", mats()["mjf"])
+        import_stl("plug", mats()["black_nylon"])
+        for i, (x, y) in enumerate((H1, H2)):
+            screw(x, y, Z_TOP - 1.8, f"screw{i}")
+        light_pipes()
+        objs, _factory_loom = vehicle_harness(veh)
+        stage(floor_z=Z_BOT * MM)
+        frame = [bpy.data.objects[n] for n in ("base", "lid", "plug")] + \
+                [o for o in objs if o.type in ("MESH", "FONT")]
+        fit_camera(frame, (0.30, -1.0, 1.05), lens=50, margin=1.0)
+        render(out / f"vehicle_{veh}.png", samples=samples)
+    return run
+
+
 SCENES = {"board_hero": sc_board_hero, "enc_closed": sc_enc_closed,
-          "enc_exploded": sc_enc_exploded, "enc_open": sc_enc_open, "enc_top": sc_enc_top}
+          "enc_exploded": sc_enc_exploded, "enc_open": sc_enc_open, "enc_top": sc_enc_top,
+          "veh_ford": sc_vehicle("ford"), "veh_gm": sc_vehicle("gm"), "veh_bmw": sc_vehicle("bmw")}
 
 
 def main():

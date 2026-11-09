@@ -18,6 +18,35 @@ Target vehicles: 2021 Ford Bronco Sport (HS/MS-CAN), 2019 Chevrolet Silverado 35
 | Board | 85 × 50 mm, 2 layers; every SMD part on top for JLCPCB Economic assembly |
 | Enclosure | 90 × 55 × 20 mm MJF nylon, ordered from JLC3DP (no printer needed) |
 
+## What it can do
+
+Auto start-stop suppression is one rule set on a general-purpose tool. Every channel boots listen-only, and anything that transmits needs an explicit command (see [Safety model](#firmware)).
+
+**With today's firmware** (built and unit-tested, not yet run on hardware):
+
+| Capability | How |
+|---|---|
+| **Telemetry capture, both buses at once** | Streams every frame from the car side (CAN1) and the module side (CAN2), timestamped, in candump format over USB. A fully loaded 1 Mbit/s bus fits. `firmware/scripts/capture.py` saves a drive to a file that opens in SavvyCAN, can-utils or `tools/canlog`. |
+| **Signal hunting** | Log while you press a button or change a setting, then diff the capture in `tools/canlog` to see which ID and byte moved. |
+| **Silent sniffing** | Bus-monitoring mode sends no ACKs, and `rslisten high` also turns the transceiver's driver off in hardware. |
+| **Inline filter / block / rewrite** | Per-direction rules between the car and one module: pass, drop, or rewrite the ID or any data nibble. Uses beyond start-stop include: forcing a setting the module would otherwise reset at key-on (drive mode, comfort settings); hiding a message a retrofit module objects to; remapping IDs so a module from another trim or year accepts the car's messages. |
+| **Bench work on a module** | Put a module on the bench with canode as its "car": send frames by hand, watch its replies, and check error counters and bus-off state (`status`). |
+| **Bus health** | Per-channel error counters, error-passive and bus-off flags, and lost-frame counts. Useful for chasing a flaky connector or a wrong bitrate. |
+
+**Hardware is ready; the firmware still needs writing:**
+
+| Capability | Uses |
+|---|---|
+| **Live decoded telemetry** | Decode known signals on the board (from a DBC) and stream values instead of raw frames: speed, RPM, gear, coolant and transmission temperature, boost, fuel level. That could feed a phone app or a custom gauge, e.g. trans temp while towing with the Silverado. |
+| **OBD-II / UDS queries** | Ask ECUs for PIDs or read trouble codes, for data that isn't broadcast. It transmits, and it needs the tap point to be on the bus the ECU listens to. |
+| **CAN-triggered output (AUX_OUT)** | The low-side switch drives a relay coil or LED, or pulls down a factory switch input. Examples: auxiliary lights with the high beams, a light bar, a reverse-camera or reverse-light trigger, a fan on high trans temp. |
+| **Physical input (AUX_IN, 0–36 V)** | An added switch or an ignition/accessory feed selects a rule set or sends a message, e.g. a dash button that toggles a mode. |
+| **Battery monitoring (VBAT sense)** | Log battery voltage, cranking dips and parked drain; cut AUX_OUT loads at low voltage. |
+| **Permanent install** | Rules live in RAM today, and the gateway is off after every power-up. A fit-and-forget start-stop install needs rules saved to flash, plus an explicit opt-in to start the gateway at boot. |
+| **Add-ons on J5** | The spare I2C/UART pins could take a Bluetooth or Wi-Fi module for a wireless console, an SD card or SPI flash for standalone logging, or a small display. |
+
+**Out of scope:** CAN-FD frames (the transceivers are classic CAN, up to 1 Mbit/s), LIN, FlexRay and automotive Ethernet.
+
 ## What it looks like
 
 | Closed, harness and USB connected | Exploded |
@@ -34,7 +63,33 @@ The harness plugs into J2 through the lid. USB-C, the three status LEDs and the 
 ![board bottom, with the J2 pinout on the silkscreen](hardware/docs/renders/canode_board_bottom.png)
 </details>
 
-Regenerate every image with `make renders` (KiCad 10, Blender, uv; about 8 minutes).
+Regenerate every image with `make renders` (KiCad 10, Blender, uv; about 10 minutes).
+
+## In the car: one board, a harness per vehicle
+
+The board, enclosure and J2 connector are the same for every vehicle. Only the T-harness changes. It plugs in between a module and its factory connector, so nothing in the car is cut or spliced, and unplugging it puts the car back to stock.
+
+| Ford Bronco Sport (gateway module) | Chevrolet Silverado 3500 |
+|---|---|
+| ![Bronco Sport T-harness](hardware/docs/renders/canode_vehicle_ford.png) | ![Silverado T-harness](hardware/docs/renders/canode_vehicle_gm.png) |
+| **BMW F80 M3** | |
+| ![F80 T-harness](hardware/docs/renders/canode_vehicle_bmw.png) | |
+
+The housings in these renders are **representative**. Pin count, colour and lock style suggest each connector family, but they are not dimensioned copies of the OEM parts. Each real harness is built once the tap point (module and pins) has been confirmed on the car.
+
+| T-harness wire | Goes to |
+|---|---|
+| Every pin except the CAN pair | straight through, factory connector ↔ module |
+| CAN H/L from the factory connector (car side) | J2 pin 2 CAN1_H, pin 6 CAN1_L |
+| CAN H/L into the module | J2 pin 3 CAN2_H, pin 7 CAN2_L |
+| The module's battery feed (or a fused tap) | J2 pin 1 +12 V |
+| The module's ground | J2 pin 5 GND |
+| Optional: ignition or accessory feed | J2 pin 4 AUX_IN |
+
+Notes:
+- **Ford Bronco Sport:** plug-in start-stop eliminators for this vehicle sit inline between the factory harness and the gateway module behind the OBD port under the steering column ([example install](https://www.4dtech.com/ford-bronco-sport-21-22-start-stop-eliminator)). That is a natural canode tap point too.
+- **Silverado and F80:** the common eliminators for these plug in behind the start-stop *switch*, which works at the button, not on CAN. For canode, the module to sit in front of is still to be picked.
+- **Termination:** cutting a bus into two segments can leave one of them unterminated, for example when the module was an end node. Measure each segment (about 60 Ω is correct) and bridge JP1/JP2 only where a segment needs it.
 
 ## Harness (J2, Molex Micro-Fit 3.0 2×4)
 

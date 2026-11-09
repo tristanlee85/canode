@@ -51,7 +51,7 @@ KR=("$KICAD_CLI" pcb render -w 2000 -h 1250)
 # 4. enclosure solids + interference check against the populated board and mated plug
 if [ "$STAGES" = all ]; then
   "$EPY" "$ENC/enclosure.py" --check
-  SCENES="${SCENES:-board_hero,enc_closed,enc_exploded,enc_open,enc_top}"
+  SCENES="${SCENES:-board_hero,enc_closed,enc_exploded,enc_open,enc_top,veh_ford,veh_gm,veh_bmw}"
 else
   [ -f build/renders/enclosure/base.stl ] || "$EPY" "$ENC/enclosure.py"
   SCENES="${SCENES:-board_hero}"

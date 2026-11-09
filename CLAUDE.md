@@ -10,13 +10,15 @@ The owner (T) is a software engineer and mechanic. He has built standalone ECUs 
 ## Resume point (updated 2026-11-09)
 All work is on `main` (pushed). `make check` was clean at the last commit.
 
-Done so far: KiCad 10 upgrade, DRC fixes, U1 → STM32G0B1CEU6 (UFQFPN-48, `validation/reports/2026-11-09_u1-qfn.md`), firmware (canode + Nucleo, host tests), ngspice sims, enclosure + renders, input-protection redesign (`validation/reports/2026-11-09_protection.md`), firmware Stop 1 sleep. T chose (2026-11-09) to let a running gateway sleep and resume on wake (car and module sides are disconnected while asleep).
+Done so far: KiCad 10 upgrade, DRC fixes, U1 → STM32G0B1CEU6 (UFQFPN-48, `validation/reports/2026-11-09_u1-qfn.md`), firmware (canode + Nucleo, host tests), ngspice sims, enclosure + renders, input-protection redesign (`validation/reports/2026-11-09_protection.md`), firmware Stop 1 sleep, per-vehicle T-harness renders (`make renders`, scenes `veh_ford/gm/bmw`; housings are representative) and a capabilities list in README. T chose (2026-11-09) to let a running gateway sleep and resume on wake (car and module sides are disconnected while asleep).
 
 Next steps, in order:
 1. **Pre-order checks (T, by hand):** J2 Molex 43045 pin order vs the Molex drawing; U1 pin-1 mark and D3 (SMC, new package) orientation in JLC's placement preview.
 2. **Order rev A** from `hardware/fab/` (or `make fab` → `build/fab/`).
 3. **Bench bring-up once boards arrive** (see `validation/README.md` for the full plan): sleep current at J2 (`sleep timeout 5`), wake on each bus at 125k/500k/1M, USB re-enumerates after RESET, `rslisten high` reception at 500k, crank-dip behavior of +3V3, and gateway sleep/resume (`firmware/README.md`, Sleep, bench step 4).
-4. Optional: tidy autorouted crystal/USB traces (ask T first: layout taste); consider a stiffer PTC if one appears at JLC (F1 37.8/40 A Imax in reverse-battery sim).
+4. **Per-vehicle T-harness:** confirm the tap point on each car (Bronco Sport: GWM behind the OBD port, where commercial eliminators go; Silverado/F80: module not chosen yet), then pick the real mating connectors/terminals and draw each harness. The README's "In the car" section has the wiring table.
+5. **Permanent-install firmware (needs T's decision first):** gateway rules are RAM-only and the gateway is off after every power-up. A fit-and-forget install needs rules saved to flash plus an explicit opt-in to start the gateway at boot, which is an exception to safety rule "nothing returns to TX by itself", so ask T how he wants it gated.
+6. Optional: tidy autorouted crystal/USB traces (ask T first: layout taste); consider a stiffer PTC if one appears at JLC (F1 37.8/40 A Imax in reverse-battery sim).
 
 ## Layout
 ```
