@@ -90,6 +90,30 @@ size_t uart_write(const char *s, size_t n)
     return i;
 }
 
+bool uart_drain(uint32_t timeout_ms)
+{
+    uint32_t start = HAL_GetTick();
+    while (s_tx_head != s_tx_tail || !(USART2->ISR & USART_ISR_TC)) {
+        if (HAL_GetTick() - start > timeout_ms)
+            return false;
+    }
+    return true;
+}
+
+void uart_pins_wake(void)
+{
+    GPIO_InitTypeDef gpio = {0};
+    gpio.Pin = BOARD_UART_RX_PIN;
+    gpio.Mode = GPIO_MODE_AF_PP;
+    gpio.Pull = GPIO_PULLUP;
+    gpio.Speed = GPIO_SPEED_FREQ_LOW;
+    gpio.Alternate = BOARD_UART_AF;
+    HAL_GPIO_Init(BOARD_UART_PORT, &gpio);
+    /* The character that woke us was half-received or garbled: discard any
+     * error flags it left behind. */
+    USART2->ICR = USART_ICR_ORECF | USART_ICR_FECF | USART_ICR_NECF | USART_ICR_PECF;
+}
+
 uint32_t uart_dropped(void)
 {
     return s_tx_dropped;

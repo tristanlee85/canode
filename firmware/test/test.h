@@ -45,5 +45,6 @@ void test_frame_ring(void);
 void test_parse(void);
 void test_shell(void);
 void test_gateway(void);
+void test_power(void);
 
 #endif

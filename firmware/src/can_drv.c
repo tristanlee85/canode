@@ -54,6 +54,7 @@ static can_chan_info_t     s_info[CAN_NUM_CHANNELS];
 static bool                s_pins_muxed[CAN_NUM_CHANNELS];
 static volatile bool       s_busoff_pending[CAN_NUM_CHANNELS];
 static frame_ring_t        s_ring;
+static bool                s_tx_ever;   /* can_enable_tx() was called since boot (sleep policy) */
 
 /* ---- transceiver ---------------------------------------------------------- */
 
@@ -213,7 +214,13 @@ int can_enable_tx(uint8_t ch, uint32_t bitrate)
 {
     if (ch >= CAN_NUM_CHANNELS)
         return CAN_ERR_ARG;
+    s_tx_ever = true;   /* sticky: blocks auto-sleep until reboot (lib/power.h) */
     return chan_configure(ch, CAN_MODE_NORMAL, bitrate);
+}
+
+bool can_tx_ever_enabled(void)
+{
+    return s_tx_ever;
 }
 
 int can_set_rs_listen(uint8_t ch, can_rs_listen_t v)
@@ -237,6 +244,56 @@ int can_set_loopback(uint8_t ch, uint32_t bitrate)
     if (ch >= CAN_NUM_CHANNELS)
         return CAN_ERR_ARG;
     return chan_configure(ch, CAN_MODE_LOOPBACK, bitrate);
+}
+
+/* ---- sleep (Stop 1) --------------------------------------------------------- */
+
+void can_sleep_enter(can_sleep_state_t *saved)
+{
+    for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
+        /* Rule 4: whatever the channel was doing, it comes back listen-only.
+         * (The sleep policy never sleeps with a TX-capable channel anyway.) */
+        saved->mode[ch] = s_info[ch].mode == CAN_MODE_OFF ? CAN_MODE_OFF : CAN_MODE_MONITOR;
+        saved->bitrate[ch] = s_info[ch].bitrate;
+
+        /* Rs high (standby: driver off, receiver on) and controller stopped. */
+        (void)chan_configure(ch, CAN_MODE_OFF, s_info[ch].bitrate);
+
+        /* Park the pins. TX: latch high first, then output, so the transceiver's
+         * TXD sees recessive throughout (it is in standby anyway). RX: plain
+         * input with a pull-up; src/sleep.c then arms the wake-up on it. The
+         * pull-up only matters on the Nucleo, where RX floats; on canode the
+         * transceiver drives RXD high when the bus is recessive, so it costs
+         * nothing. */
+        HAL_GPIO_WritePin(s_hw[ch].port, s_hw[ch].tx_pin, GPIO_PIN_SET);
+        GPIO_InitTypeDef gpio = {0};
+        gpio.Pin = s_hw[ch].tx_pin;
+        gpio.Mode = GPIO_MODE_OUTPUT_PP;
+        gpio.Pull = GPIO_NOPULL;
+        gpio.Speed = GPIO_SPEED_FREQ_LOW;
+        HAL_GPIO_Init(s_hw[ch].port, &gpio);
+        gpio.Pin = s_hw[ch].rx_pin;
+        gpio.Mode = GPIO_MODE_INPUT;
+        gpio.Pull = GPIO_PULLUP;
+        HAL_GPIO_Init(s_hw[ch].port, &gpio);
+        s_pins_muxed[ch] = false;   /* chan_configure() re-muxes them on wake */
+    }
+}
+
+void can_sleep_exit(const can_sleep_state_t *saved)
+{
+    for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
+        /* Exactly the boot path: chan_configure() holds Rs high, configures the
+         * controller in bus-monitoring mode, muxes the pins while it is in INIT,
+         * starts it, and only then drives Rs low (if rslisten is low). */
+        if (saved->mode[ch] == CAN_MODE_MONITOR)
+            (void)chan_configure(ch, CAN_MODE_MONITOR, saved->bitrate[ch]);
+    }
+}
+
+bool can_rx_pending(void)
+{
+    return frame_ring_count(&s_ring) != 0u;
 }
 
 /* ---- transmit ------------------------------------------------------------- */

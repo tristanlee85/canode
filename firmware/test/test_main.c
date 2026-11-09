@@ -12,6 +12,7 @@ int main(void)
         {"parse", test_parse},
         {"shell", test_shell},
         {"gateway", test_gateway},
+        {"power", test_power},
     };
     for (size_t i = 0; i < sizeof(suites) / sizeof(suites[0]); i++) {
         int before = g_failures;

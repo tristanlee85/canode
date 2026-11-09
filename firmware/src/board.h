@@ -28,6 +28,12 @@
 #define BOARD_LED2_PIN       GPIO_PIN_6
 #define BOARD_LED_ON         GPIO_PIN_SET      /* active high */
 
+/* Sleep wake-up for CAN2: PB0 is EXTI line 0, the same line as CAN1's PD0, and
+ * EXTICR routes each line to one port only. PB0 is also COMP3_INP (IO1), and
+ * COMP3 runs in Stop mode and wakes the chip through EXTI line 20, so CAN2
+ * wakes through the comparator. See firmware/README.md "Sleep". */
+#define BOARD_WAKE_CAN2_COMP 1
+
 #elif defined(BOARD_NUCLEO_G0B1RE)
 
 #define BOARD_NAME           "nucleo-g0b1re"
@@ -44,6 +50,11 @@
 #define BOARD_LED1_PIN       GPIO_PIN_5
 #define BOARD_LED_ON         GPIO_PIN_SET
 /* No LED2. */
+
+/* No transceiver drives PB0 here: in analog mode (needed for COMP3) it would
+ * float and wake the board at random. CAN1 (PD0, with a pull-up) and the
+ * ST-LINK virtual COM port (PA3) are the wake-up sources on the Nucleo. */
+#define BOARD_WAKE_CAN2_COMP 0
 
 #else
 #error "Define BOARD_CANODE or BOARD_NUCLEO_G0B1RE"
@@ -91,5 +102,12 @@
  * step 7) shows reception is reliable with Rs high at 125k-1M. Changing the
  * default is this one line; `rslisten` changes it at run time. */
 #define BOARD_CAN_RS_LISTEN_DEFAULT CAN_RS_LISTEN_LOW
+
+/* Sleep (STM32 Stop 1) when both buses have been quiet this long, no USB host
+ * is connected and nothing is transmit-enabled. See lib/power.h and the
+ * README "Sleep" section. `sleep on|off` and `sleep timeout <s>` change these
+ * at run time (not saved). */
+#define BOARD_SLEEP_DEFAULT_ENABLED   1
+#define BOARD_SLEEP_DEFAULT_TIMEOUT_S 60u
 
 #endif

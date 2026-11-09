@@ -15,6 +15,7 @@
 #include "can_drv.h"
 #include "candump.h"
 #include "parse.h"
+#include "power.h"
 #include "selftest.h"
 #include "stm32g0xx_hal.h"
 #include "system.h"
@@ -117,7 +118,91 @@ static int cmd_status(shell_t *sh, int argc, char **argv)
         shell_printf(sh, "log %-4s %s%s%s\r\n", console_name((port_t)p), m ? "" : "off",
                      (m & 1u) ? "can1 " : "", (m & 2u) ? "can2" : "");
     }
+    power_inhibit_t why = power_check(&g_app.power, system_millis());
+    shell_printf(sh, "sleep %s  wakes %" PRIu32 "  %s%s\r\n", g_app.power.enabled ? "on" : "off",
+                 g_app.power.wakes, why == POWER_OK ? "about to sleep" : "awake: ",
+                 why == POWER_OK ? "" : power_inhibit_str(why));
     return 0;
+}
+
+/* ---- sleep ------------------------------------------------------------------ */
+
+/* "12.3 s" (ms, one decimal; "-" for "never"). */
+static void print_secs(shell_t *sh, uint32_t ms)
+{
+    if (ms == UINT32_MAX)
+        shell_puts(sh, "-");
+    else
+        shell_printf(sh, "%" PRIu32 ".%" PRIu32 " s", ms / 1000u, (ms % 1000u) / 100u);
+}
+
+static void sleep_status(shell_t *sh)
+{
+    const power_t *pm = &g_app.power;
+    uint32_t now = system_millis();
+    power_inhibit_t why = power_check(pm, now);
+
+    shell_printf(sh, "sleep %s   timeout %" PRIu32 " s   bus idle ", pm->enabled ? "on" : "off", pm->timeout_ms / 1000u);
+    print_secs(sh, power_bus_idle_ms(pm, now));
+    shell_puts(sh, "   console idle ");
+    print_secs(sh, power_console_idle_ms(pm, now));
+    shell_puts(sh, "\r\n");
+    if (why == POWER_OK) {
+        shell_puts(sh, "      about to sleep\r\n");
+    } else {
+        shell_printf(sh, "      awake: %s", power_inhibit_str(why));
+        uint32_t left = power_ms_until_sleep(pm, now);
+        if (left != UINT32_MAX) {
+            shell_puts(sh, " (sleeps in ");
+            print_secs(sh, left);
+            shell_puts(sh, " if it stays quiet)");
+        }
+        shell_puts(sh, "\r\n");
+    }
+    char src[24];
+    power_wake_format(pm->last_wake, src, sizeof(src));
+    shell_printf(sh, "      sleeps %" PRIu32 "  wakes %" PRIu32 "  aborted %" PRIu32 "  last wake %s\r\n",
+                 pm->sleeps, pm->wakes, pm->aborted, pm->have_woken ? src : "-");
+    shell_printf(sh, "      wake sources: can1 (PD0, EXTI0)%s, uart key (PA3, EXTI3); RESET always works\r\n",
+                 BOARD_WAKE_CAN2_COMP ? ", can2 (PB0 via COMP3)" : "");
+}
+
+static int cmd_sleep(shell_t *sh, int argc, char **argv)
+{
+    power_t *pm = &g_app.power;
+    if (argc == 1) {
+        sleep_status(sh);
+        return 0;
+    }
+    if (argc == 2 && (strcmp(argv[1], "on") == 0 || strcmp(argv[1], "off") == 0)) {
+        power_set_enabled(pm, strcmp(argv[1], "on") == 0);
+        shell_printf(sh, "auto-sleep %s\r\n", argv[1]);
+        return 0;
+    }
+    if (argc == 3 && strcmp(argv[1], "timeout") == 0) {
+        uint32_t s;
+        if (!parse_u32(argv[2], &s) || !power_set_timeout_s(pm, s)) {
+            shell_printf(sh, "error: timeout must be %u..%u seconds\r\n", POWER_TIMEOUT_MIN_S, POWER_TIMEOUT_MAX_S);
+            return -1;
+        }
+        shell_printf(sh, "sleep timeout %" PRIu32 " s\r\n", s);
+        return 0;
+    }
+    if (argc == 2 && strcmp(argv[1], "now") == 0) {
+        power_inhibit_t why = power_check_now(pm);
+        if (why != POWER_OK) {
+            shell_printf(sh, "error: not sleeping: %s.\r\n"
+                             "       'mode <can1|can2> monitor' and 'gw off' first.\r\n", power_inhibit_str(why));
+            return -1;
+        }
+        g_app.sleep_request = true;   /* the main loop sleeps once this reply is out */
+        return 0;
+    }
+    shell_puts(sh, "usage: sleep                 status: idle times, why awake, wake count\r\n"
+                   "       sleep on|off          auto-sleep when both buses are idle (default on)\r\n"
+                   "       sleep timeout <s>     bus/console idle time before sleeping (default 60)\r\n"
+                   "       sleep now             sleep immediately (refused while a channel can transmit)\r\n");
+    return -1;
 }
 
 /* ---- channel configuration ------------------------------------------------ */
@@ -431,6 +516,7 @@ static const shell_cmd_t k_cmds[] = {
     {"send",     "<can1|can2> <id>#<data>",            "transmit one frame (channel must be in normal mode)", cmd_send},
     {"selftest", "[int | ext can1 can2]",              "loopback tests at 125k-1M; 'ext' TRANSMITS (bench only)", cmd_selftest},
     {"gw",       "[on|off|list|add ...|del n|clear]",  "can1<->can2 gateway rules (off by default)", cmd_gw},
+    {"sleep",    "[on|off|timeout <s>|now]",           "low-power Stop mode when the buses go quiet; wakes on CAN", cmd_sleep},
     {"echo",     "<on|off>",                           "local echo and prompt (off for scripts)", cmd_echo},
     {"reset",    "",                                   "reboot", cmd_reset},
     {"dfu",      "",                                   "reboot into the ROM USB DFU bootloader", cmd_dfu},

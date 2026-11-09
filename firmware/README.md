@@ -25,6 +25,7 @@ The board sits inline on a vehicle bus, so the firmware is built to be silent un
    - `send`: only works on a channel that is already in normal mode.
 4. **Nothing returns to a transmitting mode by itself.** After a bus-off, a bitrate change or a self-test, the channel comes back in **monitor** mode. The gateway turns off when either channel leaves normal mode. A reboot restores the defaults: both channels in monitor mode, gateway off.
 5. While any channel can transmit, LED1 blinks fast (5 Hz instead of 1 Hz).
+6. **Sleep never changes this.** The board only auto-sleeps if nothing has been transmit-enabled since boot. On waking it restores each channel to listen-only monitor mode through the same path as boot: Rs stays high until the controller is running. See [Sleep](#sleep-stop-1).
 
 The ROM bootloader (blank chip, or the `dfu` command) probes FDCAN1 on PD0/PD1. That is harmless: the transceiver stays in standby, so the bootloader cannot reach the bus.
 
@@ -82,8 +83,8 @@ cmake --build firmware/build -j            # -> firmware/build/canode.{elf,bin,h
 firmware/test/run_tests.sh                 # host unit tests (or: cmake --build firmware/build --target host-tests)
 ```
 Current size (MinSizeRel, the default build type):
-- `canode`: 36,024 B flash (27 % of 128 KB), 21,224 B RAM.
-- `nucleo_g0b1re`: 35,248 B flash, 21,216 B RAM.
+- `canode`: 40,944 B flash (31 % of 128 KB), 21,272 B RAM.
+- `nucleo_g0b1re`: 39,968 B flash, 21,264 B RAM.
 
 Most of the RAM is buffers: the 256-frame RX ring, the 4 KB USB and UART TX buffers, and a 4 KB stack.
 
@@ -149,6 +150,9 @@ screen /dev/cu.usbmodem* 115200        # quit: Ctrl-A then K
 | `selftest ext can1 can2` | **Transmits.** Bench test, CAN1→CAN2 and back, at all four rates. Needs JP1+JP2 bridged and CAN1 wired to CAN2. canode only. |
 | `gw [status\|list]`, `gw add ...`, `gw del <n>`, `gw clear` | Manage gateway rules (see below) |
 | `gw on` / `gw off` | Turn forwarding on or off. `gw on` requires both channels in normal mode. |
+| `sleep` | Sleep status: on/off, timeout, bus and console idle time, why it is awake, sleep/wake counts, last wake source |
+| `sleep on\|off` / `sleep timeout <s>` | Turn auto-sleep on or off (default on); set the idle time (5–86400 s, default 60). Not saved across reset. |
+| `sleep now` | Sleep immediately, even with USB connected. Refused while a channel can transmit. |
 | `echo <on\|off>` | Turn local echo and the prompt on or off (off for scripts) |
 | `reset` / `dfu` | Reboot / reboot into the ROM USB DFU bootloader |
 
@@ -182,12 +186,85 @@ Example: `gw add can1 3B3 rewrite data=....0.` clears the high nibble of byte 2 
 
 Rules live in RAM and are lost on reset (saving them to flash is a later step). Forwarding runs from the main loop, so it adds some latency; measure it once hardware exists.
 
+## Sleep (Stop 1)
+
+The board is meant to be wired to an always-hot feed (J2 pin 1 straight from the gateway harness). Running at 64 MHz it draws about 9 mA. When the car's buses go quiet, the firmware puts the MCU into **Stop 1** and wakes it on CAN activity.
+
+### When it sleeps
+The policy is in `lib/power.c`, which is host-tested in `test/test_power.c`. Auto-sleep needs **all** of the following:
+- Sleep is on (`sleep on`, the default; `BOARD_SLEEP_DEFAULT_ENABLED` in `board.h`).
+- No frame has been received on either channel for the timeout (default 60 s, `sleep timeout <s>`).
+- No console input on USB or UART for the timeout. Plugging or unplugging USB also counts as console input.
+- USB is not mounted by a host (`tud_mounted()`). With a laptop connected, the board never auto-sleeps.
+- No channel is transmit-capable right now (normal mode, gateway on).
+- **Transmit has not been enabled at any point since boot.** That includes `mode canN normal` and `selftest ext`. Once T has explicitly enabled transmit, auto-sleep stays off until a reboot. The reason: a wake-up only ever restores listen-only mode, so a gateway or transmit setup would silently stop working after a sleep. As a result, an installed gateway keeps drawing ~9 mA.
+- At least one channel is in monitor mode. With both channels off, nothing but the UART could wake it.
+
+`sleep now` overrides everything except a channel that can currently transmit; in that case it refuses and says why. `sleep` and `status` show what is keeping the board awake.
+
+### What happens (src/sleep.c)
+1. A message goes to both consoles, and the UART drains.
+2. Both FDCANs are stopped, and both Rs pins are driven **high**. That is transceiver standby: the driver is off and the receiver stays on, so RXD still goes low on a dominant bit. The SN65HVD230 has no lower-power mode than standby. The TX pins are parked as recessive GPIO outputs.
+3. USB is detached and powered down (the host sees an unplug), and LED1/LED2 are turned off.
+4. The wake-up sources are armed. A last check runs with interrupts masked: if a frame reached the RX ring, or an RX line is dominant right now, the board aborts and stays awake for another timeout. After that, WFI with LPMS = Stop 1. Flash is powered down in Stop.
+5. On wake the chip is running on HSI16. The firmware reruns `system_clock_init()`: HSE crystal, PLL to 64 MHz, the 40 MHz FDCAN kernel clock, and HSI48 + CRS for USB. It then restarts every channel that was listening, in **bus-monitoring mode, at its previous bitrate and `rslisten` setting**, through the same `chan_configure()` path as boot: Rs goes low only after the controller is running. USB is restarted and the wake source is recorded. The board then stays awake for at least one timeout.
+
+### Wake sources and the EXTI0 problem
+CAN1 RX is PD0 and CAN2 RX is PB0. Both are **EXTI line 0**, and EXTICR routes each EXTI line to one port only, so GPIO interrupts can't watch both. The fix used here:
+
+| Source | How | Notes |
+|---|---|---|
+| CAN1 (car side) | PD0 as GPIO input, EXTI0 (port D), falling edge | dominant = RXD low |
+| CAN2 (module side) | PB0 is also **COMP3_INP** (IO1, per ST's pin data and `stm32g0xx_ll_comp.h`). COMP3 compares it against VREFINT (~1.2 V), and its output is **EXTI line 20**, falling edge. | The comparators keep running in Stop, so no GPIO line is needed. Medium-speed power mode. |
+| UART key | PA3 (USART2 RX) as GPIO input, EXTI3, falling edge (start bit) | J4 on canode; the ST-LINK virtual COM port on the Nucleo. The key itself is lost. |
+| RESET (SW1) | always | |
+
+Only channels that were in monitor mode are armed. FDCAN itself is not a Stop-mode wake-up source on the G0, because its kernel clock stops.
+
+**USB plug-in can't wake the board.** There is no VBUS-sense pin. Detecting the host's 15k pull-downs on D+/D− with an internal pull-up is marginal: about 0.7–1.2 V against a ~1 V input threshold. It would also make the host see a device attach. **If it's asleep and you need the USB console, press RESET (or send any character on the UART).**
+
+### What you lose
+- **The first frame(s) after a wake.** The FDCAN can't receive until the crystal and PLL are running again. Start-up is roughly 2–3 ms: HSE start-up (typ ~2 ms) plus PLL lock plus channel configuration. All three figures are **UNVERIFIED**, so measure them. On a waking car bus that is a handful of frames. This is acceptable for listen-only logging; it would not be for a gateway, which is one more reason the board never auto-sleeps once transmit was enabled.
+- **Time while asleep.** TIM2 and SysTick stop in Stop mode, so `uptime` and candump timestamps don't advance while asleep. A log shows the sleep as a zero-length gap. If wall-clock time matters, run `time` again after a wake.
+- **A misconfigured channel causes a wake loop.** If a monitored bus is active at the wrong bitrate, no frames are received, so the board sleeps, wakes on the first edge, stays up for a timeout, and repeats. That is harmless, but the board is effectively awake. `sleep` shows the wake count.
+
+### Current budget while asleep (from the battery, at ~12.6 V)
+| Item | Current | Source |
+|---|---|---|
+| STM32G0B1 in Stop 1, flash powered down, + COMP3 and the VREFINT scaler | a few µA to a few tens of µA | DS13560 §5.3.5 (Stop 1 supply current) and the COMP characteristics table. **UNVERIFIED:** ST's site blocked the datasheet download, so the exact figures and table numbers were not checked. Negligible either way. |
+| 2 × SN65HVD230 in standby (Rs high) | 2 × 370 µA = **0.74 mA** | TI SN65HVD230 datasheet, standby supply current |
+| VBAT divider R11 100k + R12 10k | 12.6 V / 110 kΩ = **0.11 mA** | schematic |
+| TPS7B6933-Q1 LDO quiescent | ~15 µA | TI datasheet; also used in `validation/sim/board.inc` |
+| Power LED D4 (green, LCSC C2297) + **R1 4.7 kΩ** on +3V3 | ~0.1–0.17 mA | R1 raised from 1 kΩ on 2026-11-09 (`validation/reports/2026-11-09_protection.md`). UNVERIFIED, measure it. Firmware can't turn it off. |
+| LED1/LED2 | 0 (firmware turns them off) | |
+| Rs 10k pull-ups (Rs driven high), PA3 internal pull-up | 0 | |
+| **Total** | **~1.0–1.1 mA** | |
+
+Compare ~9 mA awake. Leaving D4 unfitted saves another ~0.1–0.17 mA.
+
+### Debugging
+- A **Debug** build (`cmake -S firmware -B firmware/build-debug -DCMAKE_BUILD_TYPE=Debug`) sets `DBGMCU_CR.DBG_STOP`, so SWD stays attached in Stop. That keeps clocks running, so current measured with a Debug build means nothing.
+- Release builds (the default MinSizeRel) drop the SWD connection while asleep. Connect under reset: hold RESET (SW1) while the debugger connects. Alternatively, wake the board first with `sleep off` from the UART.
+
+### Untested until hardware (sleep)
+- Everything above. In particular:
+  - That COMP3 in medium-speed mode wakes the board on a real 500k/1M frame. If it doesn't, switch to high-speed `PWRMODE` in `src/sleep.c`.
+  - That EXTI on PD0/PA3 wakes it.
+  - That Rs stays high from sleep entry until after the controller restarts. Check on a scope.
+  - USB re-enumeration after a wake.
+  - Clock restore, including the HSE-failed fallback.
+- Bench steps:
+  1. Run `sleep timeout 5` with nothing on the buses, measure current at J2 (12 V), and compare it with the table.
+  2. Feed frames on CAN1, then on CAN2, at 125k, 500k and 1M, and check `sleep` (last wake, wake count).
+  3. Scope RXD1 against Rs1 to measure wake latency.
+
 ## Nucleo-G0B1RE notes
 - **Clock.** It runs from HSI16, not a crystal. The HSE input only gets the ST-LINK's 8 MHz MCO if solder bridge SB17 is closed, and X3 is not fitted. ST's own Zephyr and TinyUSB board files also use HSI16.
 - **No transceivers.** Use `selftest int`. `selftest ext` is refused on this board. The FDCAN and Rs pins are the same as on canode (PD0/PD1/PD2, PB0/PB1/PB2), on the morpho headers, if you want to wire up transceiver modules.
 - **One LED.** LD4 on PA5 is LED1; there is no LED2.
 - **UART.** The shell is on the ST-LINK virtual COM port (USART2).
 - **USB.** The Nucleo has no USB device connector. To try the USB shell, wire a USB breakout to PA11 (D−, CN10-14), PA12 (D+, CN10-12) and GND.
+- **Sleep.** Same policy as canode. It wakes on a key on the ST-LINK virtual COM port, or on CAN1 (PD0, internal pull-up) if you've wired a transceiver. CAN2 wake-up is disabled (`BOARD_WAKE_CAN2_COMP 0`), because PB0 would float in the analog mode the comparator needs. The ST-LINK keeps powering the board, so measure Stop current at the Nucleo's IDD jumper (see UM2324), not at USB.
 
 ## Layout
 ```
@@ -196,9 +273,9 @@ firmware/
   cmake/                toolchain file, pinned dependency list
   ld/stm32g0b1xb.ld     linker script (128 KB flash, 128 KB RAM; deliberately the smallest G0B1, so the same image runs on the 512 KB CEU6 and the Nucleo)
   lib/                  portable C, no HAL, unit-tested on the host:
-                        bittiming, candump, frame_ring, gateway, parse, shell
+                        bittiming, candump, frame_ring, gateway, parse, power (sleep policy), shell
   src/                  target code: board.h (board differences), system (clocks, time, DFU),
-                        can_drv (FDCAN + safety rules), commands (shell), selftest, usb, uart, main
+                        can_drv (FDCAN + safety rules), commands (shell), selftest, sleep (Stop 1), usb, uart, main
   test/                 host unit tests: run_tests.sh
   scripts/capture.py    save the candump stream to a file
 ```
@@ -212,6 +289,7 @@ Everything in `src/`, in particular:
 - Bus-off handling.
 - The jump into DFU.
 - Real throughput at 1 Mbit/s.
+- Sleep / wake-up: see [Sleep](#sleep-stop-1).
 
 Suggested order for bring-up:
 1. Check `status` for the clock source.
@@ -232,3 +310,4 @@ Suggested order for bring-up:
 3. Done, untested on hardware: FDCAN internal loopback, then external CAN1↔CAN2 loopback.
 4. Done, untested on hardware: bus-monitoring capture over USB in candump format.
 5. Skeleton only: gateway: forwarding with filter and rewrite rules. Still to do: persistence, timing measurements, and per-direction counters.
+6. Done, untested on hardware: Stop 1 sleep with wake-up on CAN1, CAN2 (via COMP3) and the UART.

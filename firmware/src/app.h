@@ -9,6 +9,7 @@
 
 #include "console.h"
 #include "gateway.h"
+#include "power.h"
 #include "shell.h"
 
 #ifndef CANODE_FW_VERSION
@@ -24,6 +25,10 @@ typedef struct {
     bool       gw_enabled;
     gw_table_t gw;
     uint32_t   gw_forwarded, gw_dropped, gw_tx_fail;
+
+    /* Sleep (Stop 1). Policy in lib/power.c, mechanics in src/sleep.c. */
+    power_t    power;
+    bool       sleep_request;         /* "sleep now": done by the main loop after the reply is sent */
 } app_t;
 
 extern app_t g_app;

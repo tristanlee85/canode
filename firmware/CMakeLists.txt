@@ -36,6 +36,7 @@ set(LIB_SOURCES
     lib/frame_ring.c
     lib/gateway.c
     lib/parse.c
+    lib/power.c
     lib/shell.c)
 
 set(APP_SOURCES
@@ -46,6 +47,7 @@ set(APP_SOURCES
     src/console.c
     src/can_drv.c
     src/selftest.c
+    src/sleep.c
     src/commands.c)
 
 set(VENDOR_SOURCES

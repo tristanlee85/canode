@@ -59,6 +59,24 @@ bool usb_connected(void)
     return tud_cdc_connected();
 }
 
+bool usb_mounted(void)
+{
+    return tud_mounted();
+}
+
+void usb_stop(void)
+{
+    /* tusb_deinit() disables the interrupt, removes the D+ pull-up (the host
+     * sees an unplug) and powers the USB block down (CNTR.PDWN). Then gate its
+     * clock and drop the VDDUSB "valid" flag so the USB I/Os are isolated. */
+    (void)tusb_deinit(BOARD_TUD_RHPORT);
+    NVIC_DisableIRQ(USB_UCPD1_2_IRQn);
+    NVIC_ClearPendingIRQ(USB_UCPD1_2_IRQn);
+    __HAL_RCC_USB_CLK_DISABLE();
+    HAL_PWREx_DisableVddUSB();
+    s_open_event = false;
+}
+
 bool usb_take_open_event(void)
 {
     if (!s_open_event)

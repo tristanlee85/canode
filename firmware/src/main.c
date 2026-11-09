@@ -11,6 +11,7 @@
 #include "can_drv.h"
 #include "candump.h"
 #include "console.h"
+#include "sleep.h"
 #include "stm32g0xx_hal.h"
 #include "system.h"
 #include "uart.h"
@@ -90,6 +91,34 @@ static void handle_frame(can_frame_t *f)
         g_app.gw_tx_fail++;
 }
 
+/* Feed the sleep policy (lib/power.h) and sleep if it says so. */
+static void power_update(void)
+{
+    uint32_t now = system_millis();
+    uint8_t listen = 0;
+    bool tx_now = g_app.gw_enabled;
+    for (uint8_t ch = 0; ch < CAN_NUM_CHANNELS; ch++) {
+        can_mode_t m = can_info(ch)->mode;
+        if (m == CAN_MODE_MONITOR)
+            listen |= (uint8_t)(1u << ch);
+        if (m == CAN_MODE_NORMAL)
+            tx_now = true;
+    }
+    power_set_usb(&g_app.power, usb_mounted(), now);
+    power_set_channels(&g_app.power, listen, tx_now, can_tx_ever_enabled());
+    power_tick(&g_app.power, now);
+
+    if (g_app.sleep_request) {
+        g_app.sleep_request = false;
+        /* Re-check: the command already refused this, but state can change. */
+        if (power_check_now(&g_app.power) == POWER_OK)
+            sleep_run(true);
+        return;
+    }
+    if (power_check(&g_app.power, now) == POWER_OK)
+        sleep_run(false);
+}
+
 int main(void)
 {
     system_early_init();      /* may jump to the ROM bootloader; nothing is set up yet */
@@ -101,6 +130,8 @@ int main(void)
     uart_init();
     commands_init();
     usb_init();
+    sleep_init();
+    power_init(&g_app.power, system_millis(), BOARD_SLEEP_DEFAULT_ENABLED, BOARD_SLEEP_DEFAULT_TIMEOUT_S);
 
     print_banner(PORT_UART);
 
@@ -112,8 +143,10 @@ int main(void)
         for (int p = 0; p < PORT_COUNT; p++) {
             int c;
             /* Bounded per pass so a pasted script can't starve CAN processing. */
-            for (int i = 0; i < 64 && (c = console_getc((port_t)p)) >= 0; i++)
+            for (int i = 0; i < 64 && (c = console_getc((port_t)p)) >= 0; i++) {
                 shell_input(&g_app.shell[p], (char)c);
+                power_console(&g_app.power, system_millis());
+            }
         }
 
         uint8_t bus_off = can_poll();
@@ -129,11 +162,13 @@ int main(void)
         bool traffic = false;
         can_frame_t f;
         for (int i = 0; i < 32 && can_pop(&f); i++) {
+            power_frame(&g_app.power, f.chan, system_millis());
             handle_frame(&f);
             traffic = true;
         }
 
         (void)system_time_us();   /* keeps the 64-bit time extension current */
         leds_update(traffic);
+        power_update();
     }
 }
