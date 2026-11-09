@@ -1,0 +1,13 @@
+* canode sim 3: VBAT sense divider (R11 100k / R12 10k / C16 100n -> PA0)
+* The real board netlist with an ideal supply on VBAT_IN (so the F1 drop is included).
+*   mode dc  : run_all.py does a DC sweep of VSUP (0..50 V)
+*   mode tran: VSUP steps 0 -> vstep at t0; measures settling of VBAT_SENSE
+.include models.inc
+.include board.inc
+.param vstep=14 t0=1m
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+VSUP VBAT_IN 0 DC 0 PWL(0 0 {t0} 0 {t0+1u} {vstep})
+VAUXIN AUX_IN 0 0
+.options reltol=1e-4
+.tran 1u 20m 0 10u
+.end

@@ -1,0 +1,23 @@
+* canode sim 1: reverse battery (-14 V at J2-1)
+* Battery connected backwards at t = 1 ms. Source: 14 V battery, 20 mohm internal + 30 mohm
+* harness (rsrc), 1 uH harness inductance. AUX_IN (J2-4) is wired to the same (reversed)
+* feed through 10 ohm. Optional external load on AUX_OUT from the vehicle feed (rload/lload;
+* 1e9 = no load). Run: cd validation/sim && ngspice -D ngbehavior=ps reverse_battery.cir
+.include models.inc
+.include board.inc
+
+.param vrev=-14 rsrc=0.05 lsrc=1u
+.param rload=1e9 lload=1n
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+.param tstop=0.6
+
+VBATT SRC 0 PWL(0 0 1m 0 1.01m {vrev})
+RSRC  SRC BUS {rsrc}
+LSRC  BUS VBAT_IN {lsrc}
+RAUX  BUS AUX_IN 10
+RLD   BUS LDX {rload}
+LLD   LDX AUX_OUT {lload}
+
+.options method=gear reltol=1e-3 abstol=1e-9 vntol=1e-5 itl4=50
+.tran 2u {tstop} 0 50u
+.end

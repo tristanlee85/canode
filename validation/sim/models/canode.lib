@@ -1,0 +1,94 @@
+* canode local models: derived or behavioral, written for this project (redistributable).
+* Vendor models live in models/vendor/ (fetched by fetch_models.sh, not committed).
+*
+* ---------------------------------------------------------------------------------------
+* SMBJ_UNI: uni-directional 600 W SMB TVS, same topology as Vishay's SMBJxxA models
+* (Thomatronik template, e.g. vendor/smbj22a.txt). Vishay publishes no SMBJ24A model,
+* so SMBJ24A is this subckt with the template's parameters re-fitted to the SMBJ24A
+* datasheet (JEDEC values, identical across Vishay/Littelfuse/onsemi):
+*   VBR 26.7 min / 29.5 max @ 1 mA  -> nominal vbr = 28.1 V
+*   VC  38.9 V @ IPP 15.4 A (10/1000 us)  -> rd = (38.9 - 28.1) / 15.4 = 0.70 ohm
+* Vishay fitted its own models the same way (SMBJ22A: VBR nom 25.65, RBD 0.5725 vs
+* (35.5-25.65)/16.9 = 0.583), so this is consistent with the vendor method.
+* Forward diode (DFMOD) copied from the SMBJ22A template (VF ~2.4 V @ 30 A; datasheet
+* VF max 3.5 V @ 50 A). No self-heating: real VBR rises ~0.1 %/K during long pulses.
+* Pins: anode cathode (same order as the Vishay models).
+.SUBCKT SMBJ_UNI 9 2 PARAMS: vbr=28.1 rd=0.70
+DF 9 90 DFMOD
+.MODEL DFMOD D N=2 IS=1E-009 RS=0.037683 EG=1.11 XTI=3
++ CJO=1.2E-009 VJ=2.6 M=0.5 FC=0.5 TT=1E-008 TNOM=25
+RL 9 90 2.5E+007
+RBD 90 4 {rd}
+EBD 4 3 10 20 1
+DBD 3 9 DBDMOD
+.MODEL DBDMOD D IS=1E-015 N=0.5 TNOM=25
+IBVC 0 10 0.001
+RBVC 10 0 {vbr*1000}
+RBDX 20 23 {rd}
+DBVC 23 0 DBDMOD
+IBVD 0 20 0.001
+L1 90 2 1E-015
+.ENDS SMBJ_UNI
+
+* ---------------------------------------------------------------------------------------
+* AO3400A: AOS publishes no SPICE model. ngspice VDMOS fitted to the AOS datasheet
+* (Rev 3.1, Jul 2023): VGS(th) 1.05 V typ, RDS(on) 19 mohm typ @ 4.5 V, gFS 33 S,
+* VSD 0.7 V @ 1 A, Ciss 630 pF, Coss 75 pF, Crss 50 pF @ 15 V, Rg 3 ohm.
+* Avalanche: datasheet gives only BVDSS >= 30 V and NO avalanche (EAS/IAS) rating.
+* bv = 34 V is an ASSUMPTION (typical for 30 V trench parts: 1.1-1.2 x rated);
+* run_all.py also checks with bv = 31 V. Any VDS > 30 V is outside the datasheet.
+.MODEL AO3400A_FIT VDMOS(nchan vto=1.05 kp=24 lambda=0.01 rd=4m rs=3m rg=3
++ cgs=580p cgdmax=300p cgdmin=25p a=0.5
++ is=1e-11 n=1.0 rb=0.05 cjo=180p vj=0.8 m=0.45 tt=8n
++ bv=34 ibv=250u)
+.MODEL AO3400A_BV31 VDMOS(nchan vto=1.05 kp=24 lambda=0.01 rd=4m rs=3m rg=3
++ cgs=580p cgdmax=300p cgdmin=25p a=0.5
++ is=1e-11 n=1.0 rb=0.05 cjo=180p vj=0.8 m=0.45 tt=8n
++ bv=31 ibv=250u)
+
+* ---------------------------------------------------------------------------------------
+* PTC_BSMD1206: thermal behavioral model of the BHFUSE BSMD1206-050-30V polymer PTC.
+* No vendor model exists. Datasheet/catalog values (LCSC C883126 / JLC listing):
+*   Ihold 0.5 A, Itrip 1.0 A, Vmax 30 V, Imax 40 A, Pd(tripped) 0.8 W,
+*   Rmin 0.15 ohm, R1max 0.85 ohm, max time-to-trip 0.1 s (test current not printed;
+*   8 A is the industry-standard test point for 0.5 A/1206 PTCs, e.g. Littelfuse 1206L050).
+* Model: one thermal RC (tj node is in degC, as volts).
+*   R(T) = r25*(1 + (T-25)/40)                     (pre-trip rise, ~3.5x at the switch)
+*        + rhi / (1 + exp(-(T - tsw)/w))           (polymer switch: rhi 20 k, w 1 K, tsw 125 degC;
+*                                                   R reaches 1 ohm extra at ~115 degC)
+*   rth = 125 K/W   -> tripped state dissipates (125-25)/125 = 0.8 W  (= datasheet Pd)
+*   r25 = 0.25 ohm  -> trip current sqrt(100/(0.875*125)) = 0.96 A (datasheet 1.0 A),
+*                      at 0.5 A the device warms only ~10 K (holds)
+*   cth = 0.032 J/K -> trips in 0.1 s at 8 A (the datasheet MAXIMUM: slow corner)
+*   cth = 0.010 J/K is used as the fast/typical corner (~30 ms at 8 A).
+* tripped resistance settles where V^2/R = 0.8 W (e.g. ~245 ohm at 14 V, ~9 kohm at 85 V).
+* Not modeled: arc/breakdown above Vmax (a real part may fail there), post-trip R1 rise.
+.SUBCKT PTC_BSMD1206 p n tj PARAMS: r25=0.25 cth=0.032 rth=125 tsw=125 w=1 rhi=2e4
+.FUNC rptc(t) {r25*(1 + max(t-25,0)/40) + rhi/(1 + exp(min(max(-(t-tsw)/w,-60),60)))}
+Bptc p n I = V(p,n)/rptc(V(tj))
+Bheat 0 tj I = V(p,n)*V(p,n)/rptc(V(tj))
+Cth tj 0 {cth}
+Rth tj amb {rth}
+Vamb amb 0 25
+.ENDS PTC_BSMD1206
+
+* ---------------------------------------------------------------------------------------
+* STM32G0 FT-class I/O used as ADC input (PA0/PA1), VDD domain = +3V3.
+* Only the clamp to VSS is modeled (negative injection, limit -5 mA). ST: "positive
+* injection is not possible" on FT_xx pins, so there is no diode to VDD; the pin simply
+* follows the divider up to its abs-max VDDIO + 4.0 V. Run_all.py checks the voltage.
+* Pins: pin vss
+.SUBCKT STM32_FT_PIN pin vss
+Dneg vss pin DESD
+.MODEL DESD D IS=1e-14 N=1.0 RS=20
+Csh pin vss 5p
+.ENDS STM32_FT_PIN
+
+* ---------------------------------------------------------------------------------------
+* NFET_55V_OFF: what-if model for a 55 V SOT-23 FET (e.g. AO3422, now in the working-tree
+* schematic) used only in the OFF state to read VDS stress. Same as AO3400A_FIT except
+* body-diode breakdown bv = 58 V (assumed ~1.05 x rated). Not a fit of any real part.
+.MODEL NFET_55V_OFF VDMOS(nchan vto=1.05 kp=24 lambda=0.01 rd=4m rs=3m rg=3
++ cgs=580p cgdmax=300p cgdmin=25p a=0.5
++ is=1e-11 n=1.0 rb=0.05 cjo=180p vj=0.8 m=0.45 tt=8n
++ bv=58 ibv=250u)

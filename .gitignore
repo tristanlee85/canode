@@ -15,3 +15,15 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
+# firmware dependency downloads (cmake FetchContent cache)
+firmware/.deps/
+# analog sims: vendor SPICE models are fetched (no redistribution rights), raw sim data is large
+validation/sim/models/vendor/
+validation/sim/out/*
+!validation/sim/out/*.png
+!validation/sim/out/summary.txt
+
+# enclosure: STLs are regenerated from enclosure.py (STEP is committed)
+hardware/enclosure/out/*.stl
+# Claude Code personal settings
+.claude/settings.local.json

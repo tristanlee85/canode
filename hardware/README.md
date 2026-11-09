@@ -8,7 +8,7 @@ This is a 2-channel CAN interface board for in-vehicle sniffing and gatewaying. 
 
 | Path | What it is |
 |---|---|
-| `kicad/canode.kicad_pro` | **Open this in KiCad 8 or 9.** It was made with KiCad 7.0; newer versions upgrade it when you save. |
+| `kicad/canode.kicad_pro` | **Open this in KiCad 10.** Generated with KiCad 7.0, upgraded to KiCad 10 format on 2026-11-09. |
 | `kicad/canode.kicad_sch` | Single-sheet schematic. Nets connect by **name labels**, not drawn wires: two pins with the same label are connected. |
 | `kicad/canode.kicad_pcb` | 2-layer, 85 × 50 mm board with GND pours on both layers and stitching vias. |
 | `kicad/canode.kicad_sym`, `sym-lib-table` | Project library holding the one custom symbol (TPS7B6933). |
@@ -16,16 +16,18 @@ This is a 2-channel CAN interface board for in-vehicle sniffing and gatewaying. 
 | `fab/canode_BOM_JLC.csv` | BOM for JLC assembly (Comment / Designator / Footprint / LCSC Part #). |
 | `fab/canode_CPL_JLC.csv` | Pick-and-place file (Designator / Mid X / Mid Y / Layer / Rotation). |
 | `fab/canode_HAND_SOLDER.csv` | Parts JLC does **not** place: J2 Micro-Fit and the J3/J4/J5 pin headers. |
-| `docs/canode_schematic.pdf` | Schematic PDF for reviewing on paper. |
-| `docs/*.png` | Copper, silk and Gerber previews. |
+| `docs/canode_schematic.pdf` | Schematic PDF for reviewing on paper (regenerate: `kicad-cli sch export pdf`). |
+| `docs/renders/` | 3D board and enclosure renders (`make renders`). |
+| `3dmodels/` | Stand-in 3D models for J1, J2, SW1/SW2 and the mating plug (KiCad has none). |
+| `enclosure/` | Parametric MJF-nylon enclosure, STEP files and the render pipeline. |
 | `scripts/jlc_fab.py` | Regenerates the JLC files from the KiCad project after you edit it (`make fab`). |
 | `generator/` | Python scripts that produced the first version. `design.py` defines the parts, nets and LCSC numbers; `layout.py` defines placement. Written against the KiCad 7 Python API; once you edit in KiCad, treat KiCad as the source of truth and don't re-run it (it re-autoroutes and overwrites the board). |
 
 ## Block summary
 
-**Power.** The J2 12 V pin feeds a 500 mA PTC (F1), then a 24 V unidirectional TVS (D3, SMBJ24A), then an SS34 diode (D1). Behind the diode is a 40 V-rated 3.3 V LDO (U2, TPS7B6933-Q1, 15 µA quiescent). USB VBUS is diode-ORed onto the same node through D2, so the board runs from USB on the bench or from the car in the vehicle. If the battery is connected backwards, D1 blocks and the TVS conducts until the PTC trips.
+**Power.** The J2 12 V pin feeds a 500 mA PTC (F1), then a 24 V unidirectional TVS (D3, SMBJ24A; **under review**, see the checklist), then an SS36 diode (D1). Behind the diode is a 40 V-rated 3.3 V LDO (U2, TPS7B6933-Q1, 15 µA quiescent). USB VBUS is diode-ORed onto the same node through D2, so the board runs from USB on the bench or from the car in the vehicle. If the battery is connected backwards, D1 blocks and the TVS conducts until the PTC trips.
 
-**MCU.** STM32G0B1CBT6 (LQFP-48, 128 KB flash) with a 12 MHz crystal for an accurate CAN bit clock. USB runs from the internal 48 MHz oscillator with clock recovery (CRS).
+**MCU.** STM32G0B1CEU6 (UFQFPN-48, 512 KB flash; changed from the LQFP-48 CBT6 on 2026-11-09 because the LQFP was out of stock everywhere. Same pin numbering. The exposed pad is soldered to GND through a 3×3 via grid) with a 12 MHz crystal for an accurate CAN bit clock. USB runs from the internal 48 MHz oscillator with clock recovery (CRS).
 
 **CAN (×2).**
 - Each channel has an SN65HVD230 transceiver and an NUP2105L CAN ESD diode.
@@ -35,7 +37,7 @@ This is a 2-channel CAN interface board for in-vehicle sniffing and gatewaying. 
 
 **Sense and output.**
 - VBAT and AUX_IN each go to an ADC pin through a 100k:10k divider with a 100 nF filter. Full scale is about 36 V, about 9 mV per count.
-- AUX_OUT is a low-side AO3400A switch with an SS34 flyback diode to VBAT. It can drive a relay coil or an LED, or pull down a factory switch input.
+- AUX_OUT is a low-side AO3422 (55 V) switch with an SS36 (60 V) flyback diode to VBAT. It can drive a relay coil or an LED, or pull down a factory switch input.
 
 **Debug.** SWD header (J3), UART header (J4), 4 spare GPIO (J5), RESET and BOOT buttons, and power / two status LEDs.
 
@@ -59,7 +61,7 @@ H/L pairs are stacked across the two rows, so each twisted pair lands on adjacen
 | FDCAN2 RX / TX | PB0 / PB1 | AF3 |
 | CAN2 Rs (standby) | PB2 | drive LOW to enable transceiver |
 | USB DM / DP | PA11 / PA12 | |
-| HSE | PF0 / PF1 | 12 MHz, 30 pF load caps |
+| HSE | PF0 / PF1 | 12 MHz, 20 pF load caps |
 | VBAT sense | PA0 (ADC IN0) | V = adc × 3.3/4096 × 11 |
 | AUX_IN sense | PA1 (ADC IN1) | same divider |
 | AUX_OUT gate | PA8 | TIM1_CH1 if you want PWM |
@@ -81,7 +83,7 @@ H/L pairs are stacked across the two rows, so each twisted pair lands on adjacen
    - BOM is `canode_BOM_JLC.csv`; CPL is `canode_CPL_JLC.csv`.
    - Every line should match an LCSC part. If one shows out of stock, pick an equivalent and note the change.
 5. **Check part rotation and polarity in the placement preview.** KiCad and JLC sometimes disagree on a footprint's zero angle. Check that pin 1 or the polarity mark lines up on:
-   - U1 (LQFP pin-1 dot)
+   - U1 (QFN pin-1 corner mark; the part changed from LQFP, so check this one carefully)
    - U2 (SOT-223 tab)
    - U3 and U5 (SOIC pin 1)
    - U4, U6 and Q1 (SOT-23)
@@ -95,7 +97,7 @@ H/L pairs are stacked across the two rows, so each twisted pair lands on adjacen
    - Molex **43045-0812**, plus mating housing 43025-0800 and crimp terminals 43030-0001 (or a pre-crimped Micro-Fit pigtail).
    - Straight 2.54 mm headers: 1×5, 1×3 and 1×6.
 
-Ballpark cost: about $2 for the PCBs, plus Economic PCBA setup (about $8 + stencil). Expect roughly 6–8 extended-part fees at $3 each (MCU, LDO, transceiver, CAN ESD diode, USB-C, PTC, TVS, ...) on top of parts. That comes to something like $40–60 for 2 assembled boards before shipping; JLC's quote is the real number.
+Ballpark cost: about $2 for the PCBs, plus Economic PCBA setup (about $8 + stencil). Expect 8 extended-part fees at $3 each (per `validation/reports/2026-11-09_lcsc.md`) on top of parts. That comes to something like $40–60 for 2 assembled boards before shipping; JLC's quote is the real number.
 
 ## First power-up and programming
 
@@ -107,25 +109,26 @@ Ballpark cost: about $2 for the PCBs, plus Economic PCBA setup (about $8 + stenc
 ## Review checklist (things I want your eyes on)
 
 **Electrical decisions**
-- [ ] **PTC voltage rating.** BSMD1206-050-30V is rated 30 V, but the TVS clamps near 39 V during a load dump. That is fine for bench and sniffing use. For a permanent install, swap to a 60 V-rated PTC or a fuse.
-- [ ] **AUX_OUT FET is 30 V.** It covers relays and LEDs, but a severe load dump can exceed it. Use a 40–60 V FET (for example in SOT-23) if AUX_OUT will be permanently wired.
+- [ ] **Input TVS (D3): open decision, blocks ordering.** Simulation (`validation/reports/2026-11-09_sim.md`) shows the SMBJ24A conducts in a 35 V *suppressed* load dump and would absorb 16–49 J (several times its rating). The fix is an SMBJ33A-class part (≥ 36 V breakdown), plus a 10 Ω + ≥ 8 µF filter in front of the LDO (spikes then reach ~54 V, above its 45 V abs max) and a 60 V AUX_OUT FET. That filter adds a part, so it's a layout change. Not rated for an *unsuppressed* load dump.
+- [x] **PTC voltage rating.** With D3 sized as above, F1 only sees ≤ 13 V (when tripped by a reversed battery), so the 30 V BSMD1206 stays. No 60 V PTC exists in 1206 at JLC.
+- [x] **AUX_OUT FET.** Now AO3422 (55 V). Flyback diode D7 and the OR diodes D1/D2 are now SS36 (60 V); D2 saw ~44 V reverse in ISO 7637-2 pulse 2a.
 - [ ] **Quiescent draw on an always-hot 12 V feed.**
   - PWR LED about 1.3 mA.
   - Two SN65HVD230 in standby about 0.7 mA.
   - VBAT divider about 0.1 mA.
 
-  For a permanent install, mark D4 not-fitted or move the power LED to a GPIO. Ideally feed J2 pin 1 from a switched or ignition source.
-- [ ] **Crystal load caps.** 30 pF assumes CL = 20 pF and about 5 pF stray. Fine-tune if the measured frequency is off.
-- [ ] **CAN transceivers.** SN65HVD230 (3.3 V) is standard and interoperates with 5 V CAN, but it is specified only to 1 Mbps. That covers classic CAN; for CAN-FD with a faster data phase, swap to an FD-rated transceiver such as TCAN1044 (similar SOIC-8 pinout family, so check the pin mapping first).
+  The bigger load is the MCU running at 64 MHz (~8–9 mA total; LED is only ~0.2–0.8 mA). For a permanent install, feed J2 pin 1 from a switched or ignition source, or add a firmware stop mode that wakes on CAN.
+- [x] **Crystal load caps.** Changed 30 → 20 pF (step 7: ST's ~10 pF stray estimate left almost no oscillator start-up margin at 30 pF). Fine-tune if the measured frequency is off.
+- [ ] **CAN transceivers.** SN65HVD230 (3.3 V) is standard and interoperates with 5 V CAN, but it is specified only to 1 Mbps. That covers classic CAN; none of the target vehicles use CAN-FD. If FD is ever needed, TCAN337GDR is a true drop-in (TCAN1044 needs a 5 V supply this board doesn't have). See `validation/reports/2026-11-09_lcsc.md`.
 
 **Layout**
 - [ ] **Autorouted, not hand-optimized.** Signal tracks are 0.25 mm; power tracks are 0.5 mm (VBAT / VIN / VBUS / AUX_OUT) and 0.3 mm (3V3 / GND). USB D+/D- are not length-matched; at 12 Mbps full-speed that is fine. Re-routing the crystal and USB pairs by hand is the main tidy-up if you want it.
 - [ ] **USB-C overhang.** Check in the 3D viewer (`Alt+3`) that J1 sits flush with the board edge.
-- [ ] **One thermal-relief warning** on U5 pin 2 (GND). That pin also has a routed track, so it is electrically fine.
-- [ ] **Two silk reference labels** (C5, C7) sit close to neighbors in the dense decoupling area. Cosmetic only.
+- [x] **Thermal relief on U5 pin 2** (GND): fixed 2026-11-09 by giving that pad a solid zone connection.
+- [x] **Overlapping silk labels** (C5 / Y1): fixed 2026-11-09 by moving Y1's label 2.2 mm left.
 
 **Process**
-- [ ] **Re-run ERC and DRC.** Open in KiCad 8/9 and run **ERC** (Inspect → Electrical Rules Checker) and **DRC** (Inspect → Design Rules Checker). The headless KiCad 7 used here can't run ERC from the command line. I checked the netlist with a script instead (61 parts, 45 nets, 0 mismatches against the design table) and ran DRC through the Python API.
+- [x] **Re-run ERC and DRC.** Done with KiCad 10 on 2026-11-09: 0 ERC errors, 0 DRC errors, schematic parity clean. See `validation/reports/2026-11-09_erc.md` and `2026-11-09_drc.md`.
 - [ ] **Check LCSC stock** at order time; the numbers were checked against JLC's catalog in Nov 2026.
 
 ## Modern KiCad crash course (since ExpressPCB)

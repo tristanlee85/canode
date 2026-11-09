@@ -5,7 +5,7 @@ A small STM32G0B1 board with two CAN channels, for sniffing and gatewaying vehic
 
 The owner (T) is a software engineer and mechanic. He has built standalone ECUs before, but last did PCB work with ExpressPCB, so explain modern KiCad steps briefly when you ask him to do something in the GUI.
 
-**Status:** Rev A is designed, autorouted and **not yet reviewed or ordered**. No firmware yet.
+**Status (2026-11-09):** Rev A passes ERC/DRC and validation steps 1–5, 7 and 9; ordering is blocked on the D3 TVS decision (step 6, see `validation/reports/2026-11-09_sim.md`). U1 is now the STM32G0B1CEU6 (UFQFPN-48). Firmware builds for canode and NUCLEO-G0B1RE; untested on hardware.
 
 ## Layout
 ```
@@ -17,22 +17,29 @@ hardware/generator/    one-shot scripts that created rev A (KiCad 7 Python API).
                        build_all.sh unless T asks: it re-autoroutes and overwrites the board.
 validation/            check_pins.py + README.md (the validation plan and its status table)
 validation/reports/    dated results of each validation step (create as you go)
-firmware/              placeholder + pin map / bring-up notes
+hardware/enclosure/    build123d enclosure (own Python 3.12 venv via uv) + Blender render pipeline
+hardware/3dmodels/     stand-in STEP models for J1, J2, SW1/SW2 and the mating plug
+firmware/              CMake + HAL + TinyUSB firmware (canode + NUCLEO-G0B1RE); lib/ is host-tested
+validation/sim/        ngspice power-input simulations (vendor models fetched, not committed)
 tools/canlog/          terminal CAN logger/diff tool for STN adapters (OBDLink MX+), tests offline
 scripts/setup_mac.sh   one-time toolchain install (Homebrew)
 ```
 
 ## Setup
 - **Preferred platform: macOS** (Homebrew, native USB for ST-Link/CANable). Run `scripts/setup_mac.sh`, then `source .venv/bin/activate`.
-- On Windows, use the KiCad 9 installer plus winget/Python. Everything in the Makefile also works from Git Bash, given `KICAD_CLI="C:/Program Files/KiCad/9.0/bin/kicad-cli.exe"`.
-- **ERC/DRC need KiCad 8 or 9**: `kicad-cli` 7 can't do them. The files were written by KiCad 7 and open fine in 8 and 9. If KiCad asks to upgrade the format on save, that's expected; commit the upgraded files.
+- On Windows, use the KiCad 10 installer plus winget/Python. Everything in the Makefile also works from Git Bash, given `KICAD_CLI="C:/Program Files/KiCad/10.0/bin/kicad-cli.exe"`.
+- **KiCad 10** (current stable). The project files are KiCad 10 format (upgraded 2026-11-09), so older KiCad can't open them. Version numbers in older planning notes aren't requirements: use current stable releases of tools and libraries.
+- If Homebrew fails with "not writable" errors: `/opt/homebrew` is shared with another admin account on this Mac. Re-run `sudo chmod -R g+w /opt/homebrew`.
 
 ## Commands
 ```
 make pins        # MCU pinout vs ST official pin data (fetches STM32_open_pin_data into validation/.cache)
 make erc         # schematic ERC  -> build/erc.rpt, build/erc.json
 make drc         # DRC + schematic parity -> build/drc.rpt, build/drc.json
-make check       # pins + erc + drc
+make check       # pins + erc + drc + firmware-test + test-tools
+make firmware    # build canode + nucleo images -> firmware/build/
+make sim         # ngspice simulations -> validation/sim/out/
+make renders     # board + enclosure renders -> hardware/docs/renders/ (~8 min)
 make fab         # JLC gerber zip, BOM, CPL, hand-solder list -> build/fab/
 make test-tools  # offline tests for tools/canlog
 ```
@@ -42,6 +49,8 @@ make test-tools  # offline tests for tools/canlog
 - **ERC on this schematic:** nets connect by label stubs, not drawn wires. Expect possible warnings about PWR_FLAG or power-pin driving. Fix real errors in the schematic; explain anything you decide to leave.
 - **Editing KiCad files:** the S-expression files can be edited as text, but keep changes small and surgical. After any edit, run `make check` and `make fab`, and say what changed. Ask T to make anything involving layout or routing taste in the GUI, or propose the exact change.
 - If the schematic changes, the PCB must be updated with *Update PCB from Schematic* (F8) in the GUI. `make drc` with `--schematic-parity` catches drift.
+- **Don't run *Update Symbols/Footprints from Library*** on this project. The embedded copies are KiCad 7 originals; KiCad 10's versions moved pins (U1, Y1, JP1/JP2) and renamed the USB-C shield pin, which would disconnect the label stubs. See `validation/reports/2026-11-09_erc.md`.
+- Net-class patterns in `canode.kicad_pro` list each power net twice (`VIN` and `/VIN`), because nets are named `/VIN` once synced from the schematic. Keep both forms when adding nets, or the net silently falls back to the Default class.
 - **Part choices:** use JLC basic or preferred parts where possible (no $3 extended-part fee). Every part JLC places needs an `LCSC` field on its symbol. Parts with no LCSC number become hand-solder parts.
 - Don't commit `build/` or `validation/.cache/`.
 
@@ -51,9 +60,12 @@ make test-tools  # offline tests for tools/canlog
 - Bench tests that need termination: bridge JP1/JP2. Never leave them bridged when installing the board in a car, because the car's own network is already terminated.
 
 ## Known open issues (from the rev A review checklist)
-- F1 PTC is rated 30 V while the TVS clamps around 39 V. Q1 (AUX_OUT) is a 30 V FET. Both are marginal for load dump; consider 60 V parts.
-- Quiescent draw on an always-hot feed: about 2 mA, mostly the power LED (D4).
-- Autorouted layout: tidy the crystal and USB traces if time allows. One starved-thermal warning on U5 pin 2.
+- D3 SMBJ24A conducts in a 35 V suppressed load dump and would fail (16–49 J). Proposed: SMBJ33A + 10 Ω/≥8 µF in front of the LDO + 60 V Q1. Needs T's decision (adds a part).
+- Quiescent draw on an always-hot feed: ~8–9 mA with the MCU running (not 2 mA). Use a switched feed or a firmware stop mode.
+- J2 (Molex 43045) physical pin order is unverified against the Molex drawing: check before crimping a harness.
+- SN65HVD230 with Rs high is TI's standby = receiver-only mode, i.e. a hardware listen-only state. Firmware supports `rslisten high`; bench-test reception at 500k before making it the default.
+- When used inline (MITM), each cut bus segment may need its own termination: measure each segment before deciding on JP1/JP2.
+- Autorouted layout: tidy the crystal and USB traces if time allows.
 - JLC part rotation must be checked in their placement preview at order time.
 
 ## MCU pin map (also in firmware/README.md)

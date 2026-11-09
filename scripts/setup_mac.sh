@@ -9,7 +9,7 @@ step() { local name="$1"; shift; echo "==> $name"; if "$@"; then ok+=("$name"); 
 command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh"; exit 1; }
 
 # --- design-time tools
-step "KiCad (app + kicad-cli)"      brew install --cask kicad
+step "KiCad (app + kicad-cli)"      bash -c '[ -d /Applications/KiCad ] || brew install --cask kicad'
 step "ngspice (circuit simulation)" brew install ngspice
 step "Java 21 (Freerouting)"        brew install openjdk@21
 step "cairo (PCB renders)"          brew install cairo
@@ -20,6 +20,12 @@ step "ARM GCC toolchain"            brew install --cask gcc-arm-embedded
 step "OpenOCD"                      brew install open-ocd
 step "dfu-util (USB DFU flashing)"  brew install dfu-util
 step "stlink tools"                 brew install stlink
+
+# --- simulation + renders + enclosure
+step "cmake (firmware build)"       brew install cmake
+step "uv (enclosure venv)"          brew install uv
+step "PNG optimizers"               brew install pngquant oxipng
+step "Blender (renders)"            brew install --cask blender
 
 # --- python environment (system python3 is fine; KiCad's own python is only needed for generator/)
 step "python venv + packages"       bash -c 'python3 -m venv .venv && .venv/bin/pip install -q --upgrade pip && .venv/bin/pip install -q -r requirements.txt'

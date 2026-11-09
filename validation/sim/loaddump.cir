@@ -1,0 +1,33 @@
+* canode sim 2: ISO 16750-2 load dump (test A unsuppressed / test B suppressed)
+* Generator: UA = 13.5 V baseline, pulse to US through Ri, starting at t0.
+*   shape=0 : flat top (the plan's "87 V for 300 ms"), 100 us edges   [worst case]
+*   shape=1 : ISO-like: linear rise over tr, then exponential decay reaching 10 % at td
+* Suppressed (test B): generator output clamped to ustar (35 V) before Ri, i.e. the vehicle's
+* central suppressor. ustar=1000 = unsuppressed.
+* AUX_IN and the external AUX_OUT load (rload/lload, 1e9 = none) hang on the vehicle bus.
+* Also used for ISO 7637-2 pulse 2a (shape=1, tr 1 us, td 50 us, Ri 2 ohm) with a small tmax.
+* Q1 is OFF (aux_drv=0). Run: cd validation/sim && ngspice -D ngbehavior=ps loaddump.cir
+.include models.inc
+.include board.inc
+
+.param ua=13.5 us=87 ri=1 ustar=1000 t0=20m tr=100u td=300m shape=0
+.param rload=1e9 lload=1n
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+.param tstop=0.5 tmax=50u
+
+* generator: flat-top trapezoid (shape=0) or linear rise + exponential decay (shape=1)
+BRAW RAW 0 V = {ua} + ({us}-{ua}) * ({shape} > 0.5
++  ? (time < {t0+tr} ? max((time-{t0})/{tr},0) : exp(-(time-{t0+tr})*2.302585/{td}))
++  : min(max((time-{t0})/{tr},0),1) * min(max(({t0+tr+td}-time)/{tr},0),1))
+BGEN GEN 0 V = min(V(RAW), {ustar})
+RRI  GEN BUS {ri}
+* short harness from the vehicle bus to J2
+RH   BUS HX 20m
+LH   HX VBAT_IN 1u
+RAUX BUS AUX_IN 10
+RLD  BUS LDX {rload}
+LLD  LDX AUX_OUT {lload}
+
+.options method=gear reltol=1e-3 abstol=1e-9 vntol=1e-5 itl4=50
+.tran 5u {tstop} 0 {tmax}
+.end

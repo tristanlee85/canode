@@ -126,7 +126,7 @@ assert all(canlog.parse_candump(l) for l in lines)
 assert any("BUFFER FULL" in s for s in state.status)
 canlog.render(state, "TEST", "changed", 20)
 
-# write a log for replay test
-with open(str(__import__("pathlib").Path(__file__).resolve().parent / "sample.log"), "w") as f:
+# write a log for replay testing (temp dir: the tracked tests/sample.log is a static example capture)
+with open(str(__import__("pathlib").Path(__import__("tempfile").gettempdir()) / "canlog_sample.log"), "w") as f:
     f.write(log.getvalue())
 print("reader ok")

@@ -1,0 +1,27 @@
+* canode sim 4: TPS7B6933-Q1 start-up with the real input/output capacitors
+*   src=0 : 12 V hot-plug at J2-1 (bench lead / harness: 50 mohm, lh = 1 uH), 1 us edge
+*   src=1 : USB 5 V hot-plug on VBUS (cable 100 mohm, 0.5 uH), 100 us edge. A 1-5 us edge makes the
+*           TI model's UVLO switch chatter against its internal 1 uF V_INP node until ngspice
+*           aborts: a model artifact (VBUS just above the model's 4 V UVLO-on threshold).
+*   src=2 : 12 V slow ramp, 0 -> 12 V in 10 ms
+*   src=3 : cold-crank / start-stop dip: 13.5 V -> vdip for 30 ms (ISO 16750-2 style), board running
+.include models.inc
+.include board.inc
+.param src=0 vdip=4.5 lh=1u
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+.param tstop=20m
+* battery-side source: hot-plug step / slow ramp / crank dip, selected by src
+BBAT BATS 0 V = {src} < 0.5 ? 12*min(max((time-1m)/1u,0),1)
++  : {src} < 1.5 ? 0
++  : {src} < 2.5 ? 12*min(max((time-1m)/10m,0),1)
++  : (time < 5m ? 13.5 : time < 7m ? 13.5-(13.5-{vdip})*(time-5m)/2m : time < 37m ? {vdip}
++     : time < 47m ? {vdip}+(13.5-{vdip})*(time-37m)/10m : 13.5)
+RBAT BATS BX 50m
+LBAT BX VBAT_IN {lh}
+BUSB USBS 0 V = ({src} > 0.5 && {src} < 1.5) ? 5*min(max((time-1m)/100u,0),1) : 0
+RUSB USBS UX 100m
+LUSB UX VBUS 0.5u
+VAUXIN AUX_IN 0 0
+.options method=gear reltol=1e-3 abstol=1e-9 vntol=1e-5
+.tran 0.5u {tstop} 0 5u
+.end

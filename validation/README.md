@@ -8,13 +8,13 @@ The goal is to catch as much as possible **before** ordering boards, then bring 
 |---|---|---|---|---|
 | 1 | Netlist matches the design table | `hardware/generator/check_net.py <netlist>` | 0 mismatches | ✅ done (61 parts, 45 nets) |
 | 2 | MCU pinout vs ST's official pin data | `make pins` | 0 failures; AF numbers recorded for firmware | ✅ passes (28/28) |
-| 3 | Schematic ERC | `make erc` (KiCad 8/9) | No errors. Each warning reviewed and either fixed or explained in the report | ☐ |
-| 4 | Board DRC + schematic parity | `make drc` (KiCad 8/9) | No errors; parity clean. One known warning: starved thermal relief on U5 pin 2 | ☐ |
-| 5 | Footprint ↔ datasheet pin mapping | Compare each risky part's datasheet pinout with the KiCad footprint pad numbers (list below) | Every row matches | ☐ |
-| 6 | Analog simulation (ngspice) | `validation/sim/` (to be written) | See the simulation list below | ☐ |
-| 7 | Reference-design comparison | Each block vs its datasheet's typical application (list below) | Differences are intentional and noted | ☐ |
+| 3 | Schematic ERC | `make erc` | No errors. Each warning reviewed and either fixed or explained in the report | ✅ done (0 errors; 11 lib-mismatch warnings explained, `reports/2026-11-09_erc.md`) |
+| 4 | Board DRC + schematic parity | `make drc` | No errors; parity clean | ✅ done (0 errors, parity clean; 51 footprint-library-version warnings explained, `reports/2026-11-09_drc.md`) |
+| 5 | Footprint ↔ datasheet pin mapping | Compare each risky part's datasheet pinout with the KiCad footprint pad numbers (list below) | Every row matches | ✅ all match; J2 Molex physical pin order **unverified** (check drawing before crimping) (`reports/2026-11-09_footprints.md`) |
+| 6 | Analog simulation (ngspice) | `make sim` (`validation/sim/`) | See the simulation list below | ⚠ divider + LDO start-up pass; **D3 (SMBJ24A) overloaded in a 35 V suppressed load dump**: protection redesign pending T's decision (`reports/2026-11-09_sim.md`) |
+| 7 | Reference-design comparison | Each block vs its datasheet's typical application (list below) | Differences are intentional and noted | ✅ done; crystal caps changed 30→20 pF; other findings noted (`reports/2026-11-09_refdesign.md`) |
 | 8 | Visual review in KiCad (2D + 3D view) | Open the project; `Alt+3` for the 3D view | USB-C flush with the edge, no parts colliding, silkscreen legible | ☐ |
-| 9 | LCSC stock / price | Search each LCSC number on jlcpcb.com/parts | All in stock; extended-part count known | ☐ |
+| 9 | LCSC stock / price | Search each LCSC number on jlcpcb.com/parts | All in stock; extended-part count known | ✅ done; out-of-stock U1/D3/D5 replaced (U1 → STM32G0B1CEU6 UFQFPN-48); 8 extended parts (`reports/2026-11-09_lcsc.md`) |
 | 10 | Optional: STM32CubeMX project | Build the `.ioc` from the pin table | No conflicts; generated init code builds | ☐ |
 
 ### Step 5: parts whose pinout must be checked by hand

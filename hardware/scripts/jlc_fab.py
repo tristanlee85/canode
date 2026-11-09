@@ -8,7 +8,7 @@ Outputs (default build/fab/):
   canode_HAND_SOLDER.csv               parts with no LCSC number (connectors, headers)
 
 A part is sent to JLC assembly when its symbol has a non-empty "LCSC" field and is not
-DNP / excluded from BOM. Works with kicad-cli 7, 8 and 9.
+DNP / excluded from BOM. Tested with kicad-cli 10.
 Usage: python3 hardware/scripts/jlc_fab.py [--kicad-cli PATH] [--out DIR]
 """
 import argparse, csv, re, shutil, subprocess, sys, zipfile

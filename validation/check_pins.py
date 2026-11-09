@@ -23,7 +23,8 @@ from sexp import parse, find, find1  # noqa: E402
 
 ST_REPO = "https://github.com/STMicroelectronics/STM32_open_pin_data.git"
 CACHE = ROOT / "validation" / ".cache" / "STM32_open_pin_data"
-MCU_XML = "STM32G0B1C(B-C-E)Tx.xml"
+MCU_XML = "STM32G0B1C(B-C-E)Ux.xml"   # UFQFPN48 (U1 = STM32G0B1CEU6); same GP pin numbering as LQFP48
+EXPOSED_PAD = "49"                    # UFQFPN48 exposed pad: ST recommends soldering it to ground
 GPIO_XML = "GPIO-STM32G0Bx_gpio_v1_0_Modes.xml"
 
 # net name -> signal(s) the pin must support ("GPIO" = plain I/O is enough).
@@ -86,7 +87,9 @@ def load_netlist(path, ref):
         for node in find(n, "node"):
             if find1(node, "ref")[1] != ref: continue
             pf = find1(node, "pinfunction")
-            out[find1(node, "pin")[1]] = (name, pf[1] if pf else "")
+            pin = find1(node, "pin")[1]
+            # KiCad 10 netlists append "_<pin number>" to pinfunction (e.g. "PA0_11"); strip it
+            out[pin] = (name, pf[1].removesuffix(f"_{pin}") if pf else "")
     return out
 
 
@@ -105,6 +108,10 @@ def main():
     fails, warns, rows = [], [], []
 
     for num, (net, kname) in sorted(nl.items(), key=lambda kv: int(kv[0])):
+        if num == EXPOSED_PAD:
+            ok = net.lstrip("/") == "GND"
+            (rows if ok else fails).append(f"pin {num} exposed pad: on {net}" + ("" if ok else " (expected GND)"))
+            continue
         cands = pins.get(num)
         if not cands:
             fails.append(f"pin {num}: not a pin position on {MCU_XML}"); continue
