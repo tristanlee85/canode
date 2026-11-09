@@ -8,7 +8,7 @@
 .include models.inc
 .include board.inc
 .param src=0 vdip=4.5 lh=1u
-.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u cpre=1p
 .param tstop=20m
 * battery-side source: hot-plug step / slow ramp / crank dip, selected by src
 BBAT BATS 0 V = {src} < 0.5 ? 12*min(max((time-1m)/1u,0),1)

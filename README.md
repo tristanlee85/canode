@@ -6,13 +6,13 @@ A small STM32G0B1 board with **two CAN channels**, USB-C and a 12 V automotive i
 
 Target vehicles: 2021 Ford Bronco Sport (HS/MS-CAN), 2019 Chevrolet Silverado 3500 (GM Global A), possibly a 2016 BMW F80. All three use classic CAN, not CAN-FD.
 
-> **Status: rev A, pre-order.** The design passes ERC and DRC, the footprints and parts have been checked against datasheets and LCSC stock, and the analog front end has been simulated. **One open decision blocks ordering:** the input TVS diode (see [Open decisions](#open-decisions)). Firmware builds and its logic is unit-tested, but nothing has run on hardware yet.
+> **Status: rev A, ready to order.** The design passes ERC and DRC, the footprints and parts have been checked against datasheets and LCSC stock, and the power input has been simulated against the 35 V suppressed load dump and ISO 7637-2 pulse 2a. Before ordering, confirm J2's pin order and U1's pin-1 mark in JLC's placement preview (see [Known limits](#known-limits)). Firmware builds and its logic is unit-tested, but nothing has run on hardware yet.
 
 | | |
 |---|---|
 | MCU | STM32G0B1CEU6 (UFQFPN-48): Cortex-M0+ 64 MHz, 2× FDCAN, crystal-less USB FS, 512 KB flash |
 | CAN | 2× SN65HVD230 (3.3 V, classic CAN to 1 Mbit/s); held in standby by hardware until firmware enables them; optional 120 Ω termination per channel (solder jumper) |
-| Power | 12 V input (PTC, TVS, reverse-polarity diode) or USB, into a TPS7B69 40 V LDO |
+| Power | 12 V input (PTC, 1500 W TVS, reverse-polarity diode, RC filter) or USB, into a TPS7B69 40 V LDO; sleeps at about 1 mA when the buses go quiet |
 | I/O | VBAT and AUX_IN voltage sense, AUX_OUT low-side switch, SWD, UART, 4 spare GPIO |
 | Harness | Molex Micro-Fit 3.0, 2×4 |
 | Board | 85 × 50 mm, 2 layers; every SMD part on top for JLCPCB Economic assembly |
@@ -74,7 +74,7 @@ The full plan, with pass criteria, is in [`validation/README.md`](validation/REA
 | Footprint ↔ datasheet pinout | ✅ all match; J2's physical pin order still to confirm against the Molex drawing |
 | Reference-design comparison | ✅ crystal load caps corrected (30 → 20 pF) |
 | LCSC stock | ✅ out-of-stock MCU, TVS and LED replaced |
-| Analog simulation | ⚠ see [Open decisions](#open-decisions) |
+| Analog simulation | ✅ 35 V suppressed load dump, ISO 7637-2 pulse 2a, reverse battery, crank (after the [protection update](validation/reports/2026-11-09_protection.md)) |
 
 ## Firmware
 
@@ -82,10 +82,11 @@ Bare-metal C, CMake and `arm-none-eabi-gcc`, with ST's HAL for clocks/GPIO/FDCAN
 
 **Safety model.** Both channels boot in FDCAN bus-monitoring mode (no ACKs, no transmit), with the transceivers held in standby until each controller is configured. Transmitting (normal mode, the gateway, sending a frame) requires an explicit shell command for one named channel, and nothing re-enables it automatically: not a bus-off recovery, a reboot, or a self-test.
 
-## Open decisions
+## Known limits
 
-1. **Input TVS (D3) and the protection chain.** Simulation shows the SMBJ24A starts conducting at 26.7–29.5 V. In a *suppressed* load dump (about 35 V, which modern alternators produce) it would absorb 16–49 J, several times what it can survive. The fix is an SMBJ33A-class TVS (≥ 36 V breakdown). That lets fast spikes reach about 54 V, above the LDO's 45 V absolute maximum, so it should come with a 10 Ω + ≥ 8 µF filter in front of the LDO and a 60 V AUX_OUT FET. Details and numbers: [`validation/reports/2026-11-09_sim.md`](validation/reports/2026-11-09_sim.md). The board is not rated for an *unsuppressed* load dump (87 V).
-2. **Quiescent current on an always-hot feed** is about 9 mA with the MCU running (not the 2 mA once estimated). Feed J2 pin 1 from a switched circuit, or add a firmware stop mode that wakes on CAN.
+1. **Load dump.** The input is built for the 35 V *suppressed* load dump that modern alternators produce: the SMCJ33A TVS doesn't conduct, and a 10 Ω + 10 µF filter keeps fast spikes under 30 V at the LDO. The board is **not** rated for an *unsuppressed* load dump (87 V). Details: [`validation/reports/2026-11-09_protection.md`](validation/reports/2026-11-09_protection.md).
+2. **Quiescent current on an always-hot feed** is about 9 mA while the MCU is awake. The firmware now sleeps (STM32 Stop 1) after 60 s of bus silence and wakes on CAN1, CAN2 or a UART key. The estimated sleep draw is ~0.9 mA, plus ~0.1–0.17 mA for the always-on power LED (R1 is now 4.7 kΩ), so about 1 mA in total. Sleep is untested on hardware, and the board stays awake once transmit or the gateway has been enabled. Details: [`firmware/README.md`](firmware/README.md#sleep-stop-1).
+3. **Unverified before ordering:** J2's physical pin order against the Molex 43045 drawing, and U1's pin-1 mark in JLC's placement preview (the package changed to QFN).
 
 ## Repo map
 

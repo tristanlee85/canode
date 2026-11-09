@@ -5,7 +5,7 @@ A small STM32G0B1 board with two CAN channels, for sniffing and gatewaying vehic
 
 The owner (T) is a software engineer and mechanic. He has built standalone ECUs before, but last did PCB work with ExpressPCB, so explain modern KiCad steps briefly when you ask him to do something in the GUI.
 
-**Status (2026-11-09):** Rev A passes ERC/DRC and validation steps 1–5, 7 and 9; ordering is blocked on the D3 TVS decision (step 6, see `validation/reports/2026-11-09_sim.md`). U1 is now the STM32G0B1CEU6 (UFQFPN-48). Firmware builds for canode and NUCLEO-G0B1RE; untested on hardware.
+**Status (2026-11-09):** Rev A passes ERC/DRC and validation steps 1–7 and 9, and is ready to order once J2's pin order and U1's pin-1 mark (JLC preview) are checked. Input protection was updated for the 35 V suppressed load dump (`validation/reports/2026-11-09_protection.md`). U1 is now the STM32G0B1CEU6 (UFQFPN-48). Firmware builds for canode and NUCLEO-G0B1RE; untested on hardware.
 
 ## Layout
 ```
@@ -60,8 +60,8 @@ make test-tools  # offline tests for tools/canlog
 - Bench tests that need termination: bridge JP1/JP2. Never leave them bridged when installing the board in a car, because the car's own network is already terminated.
 
 ## Known open issues (from the rev A review checklist)
-- D3 SMBJ24A conducts in a 35 V suppressed load dump and would fail (16–49 J). Proposed: SMBJ33A + 10 Ω/≥8 µF in front of the LDO + 60 V Q1. Needs T's decision (adds a part).
-- Quiescent draw on an always-hot feed: ~8–9 mA with the MCU running (not 2 mA). Use a switched feed or a firmware stop mode.
+- Not rated for an unsuppressed (87 V) load dump; designed for the 35 V suppressed dump and ISO 7637-2 pulse 2a (SMCJ33A + R17 10 Ω/C1 10 µF ahead of the LDO + R18 2.2 Ω in the D7 path). F1 reaches 37.8 A of its 40 A Imax in a reverse-battery sim.
+- Quiescent draw on an always-hot feed: ~8–9 mA awake. Firmware Stop 1 sleep (`sleep` command, `lib/power.c`, `src/sleep.c`) gets ~1 mA including the power LED (R1 now 4.7 kΩ). Untested on hardware; never auto-sleeps once transmit was enabled since boot. CAN2 wakes via COMP3 on PB0, because PB0 and PD0 share EXTI line 0.
 - J2 (Molex 43045) physical pin order is unverified against the Molex drawing: check before crimping a harness.
 - SN65HVD230 with Rs high is TI's standby = receiver-only mode, i.e. a hardware listen-only state. Firmware supports `rslisten high`; bench-test reception at 500k before making it the default.
 - When used inline (MITM), each cut bus segment may need its own termination: measure each segment before deciding on JP1/JP2.

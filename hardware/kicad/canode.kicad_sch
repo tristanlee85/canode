@@ -9356,7 +9356,7 @@
 		)
 		(uuid "61598617-efe1-5425-8cee-e546d8081127")
 	)
-	(label "AUX_OUT"
+	(label "AUX_FLY"
 		(at 125.73 213.36 0)
 		(effects
 			(font
@@ -9806,7 +9806,7 @@
 		)
 		(uuid "aad4a38c-f552-5677-8f2a-86a6f86b97cf")
 	)
-	(label "VIN"
+	(label "VIN_PRE"
 		(at 57.15 66.04 180)
 		(effects
 			(font
@@ -11509,7 +11509,7 @@
 				)
 			)
 		)
-		(property "Value" "SMBJ24A"
+		(property "Value" "SMCJ33A"
 			(at 83.82 48.26 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11519,7 +11519,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Diode_SMD:D_SMB"
+		(property "Footprint" "Diode_SMD:D_SMC"
 			(at 83.82 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -11551,7 +11551,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C123819"
+		(property "LCSC" "C135162"
 			(at 83.82 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -11562,7 +11562,7 @@
 				)
 			)
 		)
-		(property "MPN" "SMBJ24A (MDD)"
+		(property "MPN" "SMCJ33A-13-F (Diodes Inc)"
 			(at 83.82 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -13780,7 +13780,7 @@
 				)
 			)
 		)
-		(property "Value" "1k"
+		(property "Value" "4.7k"
 			(at 91.44 104.14 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13822,7 +13822,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C21190"
+		(property "LCSC" "C23162"
 			(at 91.44 104.14 0)
 			(hide yes)
 			(show_name no)
@@ -16248,7 +16248,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "1uF 50V"
+		(property "Value" "10uF 50V"
 			(at 92.08 78.74 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -16259,7 +16259,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
+		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
 			(at 91.44 76.2 0)
 			(hide yes)
 			(show_name no)
@@ -16291,7 +16291,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C28323"
+		(property "LCSC" "C13585"
 			(at 91.44 76.2 0)
 			(hide yes)
 			(show_name no)
@@ -16302,7 +16302,7 @@
 				)
 			)
 		)
-		(property "MPN" "CL21B105KBFNNNE"
+		(property "MPN" "CL31A106KBHNNNE"
 			(at 91.44 76.2 0)
 			(hide yes)
 			(show_name no)
@@ -17164,6 +17164,287 @@
 				)
 			)
 		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 50.8 93.98 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "09c3cedd-d25e-481c-8bbe-c455e8e1512e")
+		(property "Reference" "R17"
+			(at 52.83 93.98 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "10R"
+			(at 50.8 93.98 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+			(at 50.8 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 50.8 93.98 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C17415"
+			(at 50.8 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8F100JT5E"
+			(at 50.8 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8b872e97-0a61-4c2b-af13-ea43478bb102")
+		)
+		(pin "2"
+			(uuid "fea830c5-26b5-4f6f-b827-ee3500f24b67")
+		)
+		(instances
+			(project "canode"
+				(path "/db538b6c-661e-5a88-8617-ceb886ad4dc8"
+					(reference "R17")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 50.8 90.17) (xy 50.8 87.63)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1964fae1-eaf2-42bb-ab59-be5e5bcb8c7f")
+	)
+	(label "VIN_PRE"
+		(at 50.8 87.63 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "961a27dd-e5af-417d-907c-cb5da49b9707")
+	)
+	(wire
+		(pts
+			(xy 50.8 97.79) (xy 50.8 100.33)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9dadf3cd-26d6-4520-83c7-69a9e068bc45")
+	)
+	(label "VIN"
+		(at 50.8 100.33 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "c8a6b1ab-4490-441b-98d6-99ef403a265c")
+	)
+
+	(symbol
+		(lib_id "Device:R")
+		(at 50.8 213.36 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "203ee07b-9187-4c57-9716-5c24f986ceb8")
+		(property "Reference" "R18"
+			(at 52.83 213.36 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "2.2R"
+			(at 50.8 213.36 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric"
+			(at 50.8 213.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 213.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 50.8 213.36 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "LCSC" "C17521"
+			(at 50.8 213.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "0805W8F220KT5E"
+			(at 50.8 213.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "40f85e62-9716-4261-b170-8d830ff0c238")
+		)
+		(pin "2"
+			(uuid "5d65b291-d57d-49be-a948-e609ad7f1162")
+		)
+		(instances
+			(project "canode"
+				(path "/db538b6c-661e-5a88-8617-ceb886ad4dc8"
+					(reference "R18")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(wire
+		(pts
+			(xy 50.8 209.55) (xy 50.8 207.01)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f567a206-39c4-4614-9b30-d898d9600950")
+	)
+	(label "AUX_OUT"
+		(at 50.8 207.01 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "42856bd2-dd16-4498-9cb5-4082e4f64fbd")
+	)
+	(wire
+		(pts
+			(xy 50.8 217.17) (xy 50.8 219.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "9085f443-c23f-4934-a8f9-eae7fad1b3b0")
+	)
+	(label "AUX_FLY"
+		(at 50.8 219.71 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "1382d0cd-0f88-456d-9519-b1f4caff372c")
 	)
 	(sheet_instances
 		(path "/"

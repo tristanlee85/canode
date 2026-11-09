@@ -34,6 +34,14 @@
      F1 peak 37.8 A (Imax 40), trips 12.9 ms after reversal, I2t 6.03 A2s; TVS fwd peak 37.0 A, 0.56 J
      Q1 body diode peak 0.74 A / 0.5 W, 4 mJ until trip (end 0.03 A), D7 peak 0.74 A; F1 after trip: 13.1 V across it, 58 mA
      minima: vbatf -2.65 V, vin -0.06 V, p3v3 -0.00 V, vbat_sense -0.20 V, aux_sense -0.59 V, aux_out -0.68 V
+  [rb_new] PROTECTION UPDATE (SMCJ33A, 10 ohm + 10 uF, 2.2 ohm D7), PTC slow
+     F1 peak 37.8 A (Imax 40), trips 13.0 ms after reversal, I2t 6.03 A2s; TVS fwd peak 37.0 A, 0.56 J
+     Q1 body diode peak 0.74 A / 0.5 W, 4 mJ until trip (end 0.03 A), D7 peak 0.74 A; F1 after trip: 13.1 V across it, 58 mA
+     minima: vbatf -2.65 V, vin -0.05 V, p3v3 -0.00 V, vbat_sense -0.20 V, aux_sense -0.59 V, aux_out -0.68 V
+  [rb_new_relay] PROTECTION UPDATE + 85 ohm relay on AUX_OUT, PTC slow
+     F1 peak 37.8 A (Imax 40), trips 13.0 ms after reversal, I2t 6.03 A2s; TVS fwd peak 37.0 A, 0.57 J
+     Q1 body diode peak 0.74 A / 0.5 W, 6 mJ until trip (end 0.18 A), D7 peak 0.74 A; F1 after trip: 13.1 V across it, 58 mA
+     minima: vbatf -2.65 V, vin -0.05 V, p3v3 -0.00 V, vbat_sense -0.20 V, aux_sense -0.59 V, aux_out -0.68 V
 
 === sim 2: load dump (Q1 off)
   --- TEST A: UNSUPPRESSED
@@ -75,10 +83,16 @@
      PA0 pk 4.26 V, PA1 pk 7.71 V, +3V3 3.31..3.43 V
   [ldA_33A] what-if D3 = SMBJ33A, unsuppressed, PTC slow
      VBATF pk 63.1 V | VIN pk 62.9 V (>40 V 21.7 ms, >45 V 21.3 ms) | bus pk 87.0 V
-     F1: Ipk 19.9 A, trip 20.4 ms, Vpk across F1 83.8 V (>30 V for 280 ms)
+     F1: Ipk 19.8 A, trip 20.4 ms, Vpk across F1 83.8 V (>30 V for 280 ms)
      D3: Ipk 18.7 A, Ppk 1183 W, E 21.56 J over t_eff 18.2 ms (allow ~3.08 J -> 7.0x)
      Q1: VDS pk 34.0 V (>30 V 98 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
      PA0 pk 5.66 V, PA1 pk 7.91 V, +3V3 0.03..3.45 V
+  [ldA_new] PROTECTION UPDATE, unsuppressed 87 V/1 ohm (not a design target)
+     VBATF pk 52.7 V | VIN pk 52.2 V (>40 V 12.1 ms, >45 V 11.1 ms) | bus pk 87.0 V
+     F1: Ipk 27.3 A, trip 10.7 ms, Vpk across F1 83.7 V (>30 V for 289 ms)
+     D3: Ipk 26.7 A, Ppk 1408 W, E 13.09 J over t_eff 9.3 ms (allow ~2.20 J -> 6.0x)
+     Q1: VDS pk 51.4 V (>30 V 101 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
+     PA0 pk 4.67 V, PA1 pk 7.91 V, +3V3 -0.07..3.38 V
   --- TEST B: SUPPRESSED (35 V)
   [ldB_slow] 35 V clamp/0.5 ohm 400 ms, no AUX load, PTC slow
      VBATF pk 31.4 V | VIN pk 31.2 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 34.4 V
@@ -131,7 +145,7 @@
   [ldB_33A_55V] what-if D3 = SMBJ33A + Q1 55 V FET, 35 V/0.5 ohm, relay
      VBATF pk 35.0 V | VIN pk 34.8 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 35.0 V
      F1: Ipk 1.5 A, trip -, Vpk across F1 0.4 V (>30 V for 0 ms)
-     D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 0.9 ms
+     D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 1.1 ms
      Q1: VDS pk 35.1 V (>30 V 400 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
      PA0 pk 3.18 V, PA1 pk 3.18 V, +3V3 3.31..3.44 V
   [ldB_36A] what-if D3 = SMBJ36A, 35 V/0.5 ohm, relay on AUX_OUT
@@ -140,6 +154,24 @@
      D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 2.5 ms
      Q1: VDS pk 34.1 V (>30 V 400 ms), Id pk 0.01 A, Ppk 0.4 W, E(>30 V) 0.14 J; D7 pk 0.01 A
      PA0 pk 3.18 V, PA1 pk 3.18 V, +3V3 3.31..3.44 V
+  [ldB_new] PROTECTION UPDATE, 35 V/0.5 ohm 400 ms, relay on AUX_OUT
+     VBATF pk 35.0 V | VIN pk 34.5 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 35.0 V
+     F1: Ipk 1.5 A, trip -, Vpk across F1 0.4 V (>30 V for 0 ms)
+     D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 2.6 ms
+     Q1: VDS pk 35.1 V (>30 V 400 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
+     PA0 pk 3.18 V, PA1 pk 3.18 V, +3V3 3.31..3.37 V
+  [ldB_new_ri4] PROTECTION UPDATE, 35 V/4 ohm 400 ms, relay on AUX_OUT
+     VBATF pk 34.9 V | VIN pk 34.5 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 34.9 V
+     F1: Ipk 1.2 A, trip -, Vpk across F1 0.3 V (>30 V for 0 ms)
+     D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 3.5 ms
+     Q1: VDS pk 34.9 V (>30 V 400 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
+     PA0 pk 3.17 V, PA1 pk 3.17 V, +3V3 3.31..3.36 V
+  [ldB_new_vbrmin] PROTECTION UPDATE, D3 at VBR min (36.7 V), 35 V/0.5 ohm, relay
+     VBATF pk 35.0 V | VIN pk 34.5 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 35.0 V
+     F1: Ipk 1.5 A, trip -, Vpk across F1 0.4 V (>30 V for 0 ms)
+     D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 2.6 ms
+     Q1: VDS pk 35.1 V (>30 V 400 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
+     PA0 pk 3.18 V, PA1 pk 3.18 V, +3V3 3.31..3.37 V
   --- ISO 7637-2 PULSE 2a (supplementary, for the TVS choice)
   [p2a_24A] pulse 2a 112 V/2 ohm, as built (SMBJ24A)
      VBATF pk 44.8 V | VIN pk 44.3 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 69.1 V
@@ -154,7 +186,7 @@
      Q1: VDS pk 34.1 V (>30 V 0 ms), Id pk 0.02 A, Ppk 0.8 W, E(>30 V) 0.00 J; D7 pk 0.00 A
      PA0 pk 1.37 V, PA1 pk 1.37 V, +3V3 3.31..3.69 V
   [p2a_33A_rc] pulse 2a, SMBJ33A + 10 ohm D1->VIN + C1 = 10 uF (8 uF eff.)
-     VBATF pk 61.5 V | VIN pk 23.6 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 90.7 V
+     VBATF pk 61.5 V | VIN pk 23.6 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 90.6 V
      F1: Ipk 22.2 A, trip -, Vpk across F1 5.6 V (>30 V for 0 ms)
      D3: Ipk 17.5 A, Ppk 1077 W, E 0.01 J over t_eff 0.0 ms (allow ~0.07 J -> 0.2x)
      Q1: VDS pk 34.1 V (>30 V 0 ms), Id pk 0.05 A, Ppk 1.7 W, E(>30 V) 0.00 J; D7 pk 0.00 A
@@ -177,6 +209,18 @@
      D3: Ipk 7.1 A, Ppk 234 W, E 0.00 J over t_eff 0.0 ms (allow ~0.08 J -> 0.0x)
      Q1: VDS pk 31.6 V (>30 V 0 ms), Id pk 0.00 A, Ppk 0.0 W, E(>30 V) 0.00 J; D7 pk 0.00 A
      PA0 pk 1.29 V, PA1 pk 1.29 V, +3V3 3.31..3.55 V
+  [p2a_new] PROTECTION UPDATE, pulse 2a 112 V/2 ohm, relay on AUX_OUT
+     VBATF pk 50.8 V | VIN pk 29.1 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 86.8 V
+     F1: Ipk 26.6 A, trip -, Vpk across F1 6.7 V (>30 V for 0 ms)
+     D3: Ipk 23.0 A, Ppk 1169 W, E 0.01 J over t_eff 0.0 ms (allow ~0.08 J -> 0.2x)
+     Q1: VDS pk 48.0 V (>30 V 0 ms), Id pk 0.01 A, Ppk 0.2 W, E(>30 V) 0.00 J; D7 pk 0.00 A
+     PA0 pk 1.36 V, PA1 pk 1.37 V, +3V3 3.31..3.41 V
+  [p2a_new_vbrmax] PROTECTION UPDATE, pulse 2a, D3 at VBR max (40.6 V), relay
+     VBATF pk 52.3 V | VIN pk 29.7 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 87.3 V
+     F1: Ipk 25.9 A, trip -, Vpk across F1 6.5 V (>30 V for 0 ms)
+     D3: Ipk 22.2 A, Ppk 1161 W, E 0.01 J over t_eff 0.0 ms (allow ~0.08 J -> 0.2x)
+     Q1: VDS pk 49.4 V (>30 V 0 ms), Id pk 0.01 A, Ppk 0.2 W, E(>30 V) 0.00 J; D7 pk 0.00 A
+     PA0 pk 1.36 V, PA1 pk 1.37 V, +3V3 3.31..3.41 V
   --- NORMAL 13.5 V: AUX_OUT relay turn-off
   [fly_relay] 13.5 V, relay ON then Q1 turned off (normal flyback)
      VBATF pk 13.5 V | VIN pk 13.3 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 13.5 V
@@ -189,6 +233,12 @@
      F1: Ipk 0.0 A, trip -, Vpk across F1 0.0 V (>30 V for 0 ms)
      D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 0.1 ms
      Q1: VDS pk 14.1 V (>30 V 0 ms), Id pk 0.16 A, Ppk 0.7 W, E(>30 V) 0.00 J; D7 pk 0.16 A
+     PA0 pk 1.23 V, PA1 pk 1.23 V, +3V3 3.31..3.31 V
+  [fly_new] PROTECTION UPDATE, 13.5 V relay turn-off (normal flyback)
+     VBATF pk 14.4 V | VIN pk 13.1 V (>40 V 0.0 ms, >45 V 0.0 ms) | bus pk 13.5 V
+     F1: Ipk 0.0 A, trip -, Vpk across F1 0.0 V (>30 V for 0 ms)
+     D3: Ipk 0.0 A, Ppk 0 W, E 0.00 J over t_eff 0.0 ms
+     Q1: VDS pk 15.0 V (>30 V 0 ms), Id pk 0.16 A, Ppk 0.7 W, E(>30 V) 0.00 J; D7 pk 0.16 A
      PA0 pk 1.23 V, PA1 pk 1.23 V, +3V3 3.31..3.31 V
 
 === sim 3: VBAT divider
@@ -211,5 +261,9 @@
   [st_ramp] 12 V slow ramp (10 ms): VIN pk 11.8 V, VBATF pk 12.0 V, VBUS pk 0.00 V, inrush 0.93 A (D1 0.93 A); +3V3 10-90% 86 us, to 3.0 V 3568 us, max 3.308 V, min 3.308 V, VIN min 11.76 V (datasheet-dropout worst 3.30 V)
   [st_crank45] crank dip 13.5 -> 4.5 V, 30 ms: VIN pk 13.3 V, VBATF pk 13.5 V, VBUS pk 0.00 V, inrush 0.02 A (D1 0.02 A); +3V3 10-90% -, to 3.0 V -, max 3.310 V, min 3.300 V, VIN min 4.26 V (datasheet-dropout worst 3.30 V)
   [st_crank60] start-stop dip 13.5 -> 6.0 V, 30 ms: VIN pk 13.3 V, VBATF pk 13.5 V, VBUS pk 0.00 V, inrush 0.02 A (D1 0.02 A); +3V3 10-90% -, to 3.0 V -, max 3.310 V, min 3.302 V, VIN min 5.76 V (datasheet-dropout worst 3.30 V)
+  [st_hot12_new] PROTECTION UPDATE: 12 V hot-plug (1 uH lead): VIN pk 11.5 V, VBATF pk 12.0 V, VBUS pk 0.00 V, inrush 1.11 A (D1 1.11 A); +3V3 10-90% 67 us, to 3.0 V 92 us, max 3.308 V, min 3.308 V, VIN min 11.54 V (datasheet-dropout worst 3.30 V)
+  [st_usb_new] PROTECTION UPDATE: USB 5 V hot-plug: VIN pk 4.8 V, VBATF pk 0.0 V, VBUS pk 5.03 V, inrush 0.00 A (D1 0.00 A); +3V3 10-90% 68 us, to 3.0 V 161 us, max 3.301 V, min 3.301 V, VIN min 4.76 V (datasheet-dropout worst 3.30 V)
+  [st_crank45_new] PROTECTION UPDATE: crank dip to 4.5 V, 50 mA load (transceivers on): VIN pk 12.7 V, VBATF pk 13.5 V, VBUS pk 0.00 V, inrush 0.06 A (D1 0.06 A); +3V3 10-90% -, to 3.0 V -, max 3.309 V, min 3.299 V, VIN min 3.72 V (datasheet-dropout worst 2.92 V)
+  [st_crank60_new] PROTECTION UPDATE: start-stop dip to 6.0 V, 50 mA load: VIN pk 12.7 V, VBATF pk 13.5 V, VBUS pk 0.00 V, inrush 0.05 A (D1 0.05 A); +3V3 10-90% -, to 3.0 V -, max 3.309 V, min 3.301 V, VIN min 5.22 V (datasheet-dropout worst 3.30 V)
 
 plots: /Users/tristanlee/Projects/canode/validation/sim/out/sim*.png

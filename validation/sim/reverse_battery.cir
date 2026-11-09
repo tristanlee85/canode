@@ -8,7 +8,7 @@
 
 .param vrev=-14 rsrc=0.05 lsrc=1u
 .param rload=1e9 lload=1n
-.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u cpre=1p
 .param tstop=0.6
 
 VBATT SRC 0 PWL(0 0 1m 0 1.01m {vrev})

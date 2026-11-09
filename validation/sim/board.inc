@@ -10,6 +10,7 @@
 *   toff                 time PA8 drops to 0 (10 = never)
 *   rd7                  series R in the D7 flyback path (what-if; 1m = as built)
 *   rvin, c1eff          series R D1->VIN and C1 effective value (what-if; 1m / 0.8u = as built)
+*   cpre                 cap on D1's cathode ahead of rvin (what-if; 1p = as built)
 *
 * Current probes (0 V sources): VIF1 (F1, VBAT_IN -> VBATF), VID3 (D3 TVS, cathode
 * current), VID1 (D1), VID7 (D7, AUX_OUT -> VBATF), VIQ1 (Q1 drain).
@@ -23,6 +24,9 @@ VID1 VBATF D1A 0
 XD1  D1A VINR ss34
 * rvin: what-if series resistor D1 -> VIN (default 1 mohm = as built)
 RVIN VINR VIN {rvin}
+* cpre: capacitor on D1's cathode, ahead of RVIN (what-if; 1p = as built, no such cap)
+CPRE VINR CPX {cpre}
+RCPRE CPX 0 10m
 * ---- USB OR-ing diode D2 and VBUS cap C15 (VBUS left floating unless driven)
 XD2  VBUS VIN ss34
 C15  VBUS 0 4.7u

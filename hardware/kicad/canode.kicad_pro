@@ -392,6 +392,22 @@
       {
         "netclass": "Supply",
         "pattern": "/GND"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "VIN_PRE"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "/VIN_PRE"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "AUX_FLY"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "/AUX_FLY"
       }
     ]
   },

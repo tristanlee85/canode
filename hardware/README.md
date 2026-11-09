@@ -25,7 +25,7 @@ This is a 2-channel CAN interface board for in-vehicle sniffing and gatewaying. 
 
 ## Block summary
 
-**Power.** The J2 12 V pin feeds a 500 mA PTC (F1), then a 24 V unidirectional TVS (D3, SMBJ24A; **under review**, see the checklist), then an SS36 diode (D1). Behind the diode is a 40 V-rated 3.3 V LDO (U2, TPS7B6933-Q1, 15 µA quiescent). USB VBUS is diode-ORed onto the same node through D2, so the board runs from USB on the bench or from the car in the vehicle. If the battery is connected backwards, D1 blocks and the TVS conducts until the PTC trips.
+**Power.** The J2 12 V pin feeds a 500 mA PTC (F1), then a 1500 W unidirectional TVS (D3, SMCJ33A, 36.7 V minimum breakdown), then an SS36 diode (D1). An RC filter (R17 10 Ω, C1 10 µF/50 V) follows the diode, then a 40 V-rated 3.3 V LDO (U2, TPS7B6933-Q1, 15 µA quiescent). The TVS stays off in a 35 V suppressed load dump. The filter holds fast spikes (ISO 7637-2 pulse 2a) under 30 V at the LDO. USB VBUS is diode-ORed onto the LDO input through D2, after the filter, so the board runs from USB on the bench or from the car in the vehicle. If the battery is connected backwards, D1 blocks and the TVS conducts until the PTC trips. Not rated for an unsuppressed (87 V) load dump. See `validation/reports/2026-11-09_protection.md`.
 
 **MCU.** STM32G0B1CEU6 (UFQFPN-48, 512 KB flash; changed from the LQFP-48 CBT6 on 2026-11-09 because the LQFP was out of stock everywhere. Same pin numbering. The exposed pad is soldered to GND through a 3×3 via grid) with a 12 MHz crystal for an accurate CAN bit clock. USB runs from the internal 48 MHz oscillator with clock recovery (CRS).
 
@@ -37,7 +37,7 @@ This is a 2-channel CAN interface board for in-vehicle sniffing and gatewaying. 
 
 **Sense and output.**
 - VBAT and AUX_IN each go to an ADC pin through a 100k:10k divider with a 100 nF filter. Full scale is about 36 V, about 9 mV per count.
-- AUX_OUT is a low-side AO3422 (55 V) switch with an SS36 (60 V) flyback diode to VBAT. It can drive a relay coil or an LED, or pull down a factory switch input.
+- AUX_OUT is a low-side AO3422 (55 V) switch with an SS36 (60 V) flyback diode to VBAT, through R18 (2.2 Ω), which keeps reverse-battery current out of Q1's body diode. It can drive a relay coil or an LED, or pull down a factory switch input.
 
 **Debug.** SWD header (J3), UART header (J4), 4 spare GPIO (J5), RESET and BOOT buttons, and power / two status LEDs.
 
@@ -109,15 +109,10 @@ Ballpark cost: about $2 for the PCBs, plus Economic PCBA setup (about $8 + stenc
 ## Review checklist (things I want your eyes on)
 
 **Electrical decisions**
-- [ ] **Input TVS (D3): open decision, blocks ordering.** Simulation (`validation/reports/2026-11-09_sim.md`) shows the SMBJ24A conducts in a 35 V *suppressed* load dump and would absorb 16–49 J (several times its rating). The fix is an SMBJ33A-class part (≥ 36 V breakdown), plus a 10 Ω + ≥ 8 µF filter in front of the LDO (spikes then reach ~54 V, above its 45 V abs max) and a 60 V AUX_OUT FET. That filter adds a part, so it's a layout change. Not rated for an *unsuppressed* load dump.
-- [x] **PTC voltage rating.** With D3 sized as above, F1 only sees ≤ 13 V (when tripped by a reversed battery), so the 30 V BSMD1206 stays. No 60 V PTC exists in 1206 at JLC.
+- [x] **Input TVS (D3) and protection chain.** Done 2026-11-09: SMCJ33A (1500 W, 36.7 V min breakdown) replaces the SMBJ24A, which would have absorbed 16–49 J in a 35 V suppressed load dump. Added R17 10 Ω + C1 10 µF ahead of the LDO and R18 2.2 Ω in the D7 path. Simulated: D3 carries 0 A at 35 V, the LDO sees ≤ 34.5 V, Q1 ≤ 49.4 V of 55 V (`validation/reports/2026-11-09_protection.md`). Still not rated for an *unsuppressed* load dump.
+- [x] **PTC voltage rating.** With D3 sized as above, F1 only sees ≤ 13 V (when tripped by a reversed battery), so the 30 V BSMD1206 stays. No 60 V PTC exists in 1206 at JLC. Its 40 A Imax is the tightest margin left: 37.8 A peak in the reverse-battery sim.
 - [x] **AUX_OUT FET.** Now AO3422 (55 V). Flyback diode D7 and the OR diodes D1/D2 are now SS36 (60 V); D2 saw ~44 V reverse in ISO 7637-2 pulse 2a.
-- [ ] **Quiescent draw on an always-hot 12 V feed.**
-  - PWR LED about 1.3 mA.
-  - Two SN65HVD230 in standby about 0.7 mA.
-  - VBAT divider about 0.1 mA.
-
-  The bigger load is the MCU running at 64 MHz (~8–9 mA total; LED is only ~0.2–0.8 mA). For a permanent install, feed J2 pin 1 from a switched or ignition source, or add a firmware stop mode that wakes on CAN.
+- [x] **Quiescent draw on an always-hot 12 V feed.** Awake: ~9 mA (the MCU at 64 MHz dominates). The firmware now drops to STM32 Stop 1 after 60 s of bus silence and wakes on CAN1, CAN2 or a UART key. R1 went from 1 kΩ to 4.7 kΩ so the always-on PWR LED draws ~0.1–0.17 mA. Estimated sleep total: about 1 mA (two SN65HVD230s in standby 0.74 mA, VBAT divider 0.11 mA, LED, LDO, MCU). Measure on the bench (`firmware/README.md`, Sleep).
 - [x] **Crystal load caps.** Changed 30 → 20 pF (step 7: ST's ~10 pF stray estimate left almost no oscillator start-up margin at 30 pF). Fine-tune if the measured frequency is off.
 - [ ] **CAN transceivers.** SN65HVD230 (3.3 V) is standard and interoperates with 5 V CAN, but it is specified only to 1 Mbps. That covers classic CAN; none of the target vehicles use CAN-FD. If FD is ever needed, TCAN337GDR is a true drop-in (TCAN1044 needs a 5 V supply this board doesn't have). See `validation/reports/2026-11-09_lcsc.md`.
 

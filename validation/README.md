@@ -11,7 +11,7 @@ The goal is to catch as much as possible **before** ordering boards, then bring 
 | 3 | Schematic ERC | `make erc` | No errors. Each warning reviewed and either fixed or explained in the report | ✅ done (0 errors; 11 lib-mismatch warnings explained, `reports/2026-11-09_erc.md`) |
 | 4 | Board DRC + schematic parity | `make drc` | No errors; parity clean | ✅ done (0 errors, parity clean; 51 footprint-library-version warnings explained, `reports/2026-11-09_drc.md`) |
 | 5 | Footprint ↔ datasheet pin mapping | Compare each risky part's datasheet pinout with the KiCad footprint pad numbers (list below) | Every row matches | ✅ all match; J2 Molex physical pin order **unverified** (check drawing before crimping) (`reports/2026-11-09_footprints.md`) |
-| 6 | Analog simulation (ngspice) | `make sim` (`validation/sim/`) | See the simulation list below | ⚠ divider + LDO start-up pass; **D3 (SMBJ24A) overloaded in a 35 V suppressed load dump**: protection redesign pending T's decision (`reports/2026-11-09_sim.md`) |
+| 6 | Analog simulation (ngspice) | `make sim` (`validation/sim/`) | See the simulation list below | ✅ after the protection update: SMCJ33A + 10 Ω/10 µF filter + 2.2 Ω in the D7 path; the 35 V suppressed dump, pulse 2a, reverse battery and crank all pass (`reports/2026-11-09_sim.md`, `reports/2026-11-09_protection.md`). Not rated for an unsuppressed 87 V dump. |
 | 7 | Reference-design comparison | Each block vs its datasheet's typical application (list below) | Differences are intentional and noted | ✅ done; crystal caps changed 30→20 pF; other findings noted (`reports/2026-11-09_refdesign.md`) |
 | 8 | Visual review in KiCad (2D + 3D view) | Open the project; `Alt+3` for the 3D view | USB-C flush with the edge, no parts colliding, silkscreen legible | ☐ |
 | 9 | LCSC stock / price | Search each LCSC number on jlcpcb.com/parts | All in stock; extended-part count known | ✅ done; out-of-stock U1/D3/D5 replaced (U1 → STM32G0B1CEU6 UFQFPN-48); 8 extended parts (`reports/2026-11-09_lcsc.md`) |
@@ -26,7 +26,7 @@ The goal is to catch as much as possible **before** ordering boards, then bring 
 | U4, U6 | NUP2105L (SOT-23) | 1, 2 = CAN lines, 3 = common/GND | |
 | U7 | USBLC6-2SC6 (SOT-23-6) | 1/6 = I/O1, 3/4 = I/O2, 2 = GND, 5 = VBUS | |
 | D1, D2, D7 | SS34 (SMA) | pad 1 = cathode | Polarity |
-| D3 | SMBJ24A (SMB) | pad 1 = cathode, to VBATF | Polarity: backwards makes it a short to ground |
+| D3 | SMCJ33A (SMC) | pad 1 = cathode, to VBATF | Polarity: backwards makes it a short to ground |
 | D4–D6 | LEDs | pad 1 = cathode | Polarity |
 | Y1 | X322512MSB4SI (3225) | 1/3 = crystal, 2/4 = GND | |
 | J1 | HRO TYPE-C-31-M-12 | A/B pin letters per the footprint | |

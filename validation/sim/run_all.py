@@ -213,6 +213,9 @@ def sim_reverse(plots: bool) -> tuple[list[dict], dict]:
         ("rb_relay", "85 ohm / 0.2 H relay on AUX_OUT", dict(ptc_cth=0.032, rload=85, lload=0.2)),
         ("rb_lamp", "12 ohm lamp on AUX_OUT", dict(ptc_cth=0.032, rload=12, lload=1e-6)),
         ("rb_rd7", "what-if: 2.2 ohm in series with D7, PTC slow", dict(ptc_cth=0.032, rd7=2.2)),
+        ("rb_new", "PROTECTION UPDATE (SMCJ33A, 10 ohm + 10 uF, 2.2 ohm D7), PTC slow", dict(ptc_cth=0.032, **NEW)),
+        ("rb_new_relay", "PROTECTION UPDATE + 85 ohm relay on AUX_OUT, PTC slow",
+         dict(ptc_cth=0.032, rload=85, lload=0.2, **NEW)),
     ]
     res, keep = [], {}
     for tag, desc, prm in cases:
@@ -257,6 +260,12 @@ RELAY = dict(rload=85, lload=0.2)
 LAMP = dict(rload=24, lload=1e-6)
 SMBJ33A = dict(tvs_vbr=38.65, tvs_rd=1.30)
 SMBJ36A = dict(tvs_vbr=42.1, tvs_rd=1.54)
+# Protection update (2026-11-09, now on the board): D3 = SMCJ33A (1500 W SMC; same VBR as SMBJ33A,
+# rd = (53.3 - 38.65) / 28.2 A = 0.52 ohm), R17 10 ohm D1 -> VIN, C1 = 10 uF/50 V X5R 1206
+# (~3 uF effective at 25-30 V bias; conservative), R18 2.2 ohm in series with D7, Q1 = AO3422 (55 V).
+SMCJ33A = dict(tvs_vbr=38.65, tvs_rd=0.52)
+NEW = dict(SMCJ33A, rvin=10, c1eff=3e-6, rd7=2.2)
+Q55 = {"AO3400A_FIT": "NFET_55V_OFF"}
 UNSUP = dict(us=87, ri=1, ustar=1000, td=0.3, tstop=0.325)   # stop 5 ms after the pulse: see report
 SUP = dict(us=87, ri=0.5, ustar=35, td=0.4, tstop=0.425)
 P2A = dict(us=13.5 + 112, ri=2, ustar=1000, shape=1, tr=1e-6, td=50e-6, t0=0.001, tstop=0.0015, tmax=0.2e-6)
@@ -299,6 +308,17 @@ def ld_cases():
         ("B", "ldB_33A_55V", "what-if D3 = SMBJ33A + Q1 55 V FET, 35 V/0.5 ohm, relay", dict(SUP, **SMBJ33A, **RELAY),
          {"AO3400A_FIT": "NFET_55V_OFF"}),
         ("B", "ldB_36A", "what-if D3 = SMBJ36A, 35 V/0.5 ohm, relay on AUX_OUT", dict(SUP, **SMBJ36A, **RELAY), None),
+        # ---- the protection update now on the board (NEW), Q1 = AO3422 55 V
+        ("B", "ldB_new", "PROTECTION UPDATE, 35 V/0.5 ohm 400 ms, relay on AUX_OUT", dict(SUP, **NEW, **RELAY), Q55),
+        ("B", "ldB_new_ri4", "PROTECTION UPDATE, 35 V/4 ohm 400 ms, relay on AUX_OUT", dict(SUP, **NEW, **RELAY, ri=4), Q55),
+        ("B", "ldB_new_vbrmin", "PROTECTION UPDATE, D3 at VBR min (36.7 V), 35 V/0.5 ohm, relay",
+         dict(SUP, **dict(NEW, tvs_vbr=36.7), **RELAY), Q55),
+        ("P", "p2a_new", "PROTECTION UPDATE, pulse 2a 112 V/2 ohm, relay on AUX_OUT", dict(P2A, **NEW, **RELAY), Q55),
+        ("P", "p2a_new_vbrmax", "PROTECTION UPDATE, pulse 2a, D3 at VBR max (40.6 V), relay",
+         dict(P2A, **dict(NEW, tvs_vbr=40.6), **RELAY), Q55),
+        ("N", "fly_new", "PROTECTION UPDATE, 13.5 V relay turn-off (normal flyback)",
+         dict(us=13.5, aux_drv=3.3, toff=0.05, tstop=0.1, **NEW, **RELAY), None),
+        ("A", "ldA_new", "PROTECTION UPDATE, unsuppressed 87 V/1 ohm (not a design target)", dict(UNSUP, **NEW), Q55),
     ]
     return c
 
@@ -397,6 +417,12 @@ def sim_startup(plots: bool) -> list[dict]:
         ("st_ramp", "12 V slow ramp (10 ms)", dict(src=2, tstop=0.02)),  # metrics after 12 ms
         ("st_crank45", "crank dip 13.5 -> 4.5 V, 30 ms", dict(src=3, vdip=4.5, tstop=0.06)),
         ("st_crank60", "start-stop dip 13.5 -> 6.0 V, 30 ms", dict(src=3, vdip=6.0, tstop=0.06)),
+        ("st_hot12_new", "PROTECTION UPDATE: 12 V hot-plug (1 uH lead)", dict(src=0, tstop=0.006, **NEW)),
+        ("st_usb_new", "PROTECTION UPDATE: USB 5 V hot-plug", dict(src=1, tstop=0.006, **NEW)),
+        ("st_crank45_new", "PROTECTION UPDATE: crank dip to 4.5 V, 50 mA load (transceivers on)",
+         dict(src=3, vdip=4.5, tstop=0.06, rload3=66, **NEW)),
+        ("st_crank60_new", "PROTECTION UPDATE: start-stop dip to 6.0 V, 50 mA load",
+         dict(src=3, vdip=6.0, tstop=0.06, rload3=66, **NEW)),
     ]
     res, keep = [], {}
     for tag, desc, prm in cases:

@@ -12,7 +12,7 @@
 
 .param ua=13.5 us=87 ri=1 ustar=1000 t0=20m tr=100u td=300m shape=0
 .param rload=1e9 lload=1n
-.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u
+.param tvs_vbr=28.1 tvs_rd=0.70 ptc_r25=0.25 ptc_cth=0.032 rload3=165 aux_drv=0 toff=10 rd7=1m rvin=1m c1eff=0.8u cpre=1p
 .param tstop=0.5 tmax=50u
 
 * generator: flat-top trapezoid (shape=0) or linear rise + exponential decay (shape=1)
