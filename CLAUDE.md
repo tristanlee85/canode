@@ -7,6 +7,18 @@ The owner (T) is a software engineer and mechanic. He has built standalone ECUs 
 
 **Status (2026-11-09):** Rev A passes ERC/DRC and validation steps 1–7 and 9, and is ready to order once J2's pin order and U1's pin-1 mark (JLC preview) are checked. Input protection was updated for the 35 V suppressed load dump (`validation/reports/2026-11-09_protection.md`). U1 is now the STM32G0B1CEU6 (UFQFPN-48). Firmware builds for canode and NUCLEO-G0B1RE; untested on hardware.
 
+## Resume point (updated 2026-11-09)
+Work is on branch `rev-a-kicad10` (pushed; not yet merged to `main`, no PR opened). `make check` was clean at the last commit.
+
+Done on this branch: KiCad 10 upgrade, DRC fixes, U1 → STM32G0B1CEU6 (UFQFPN-48, `validation/reports/2026-11-09_u1-qfn.md`), firmware (canode + Nucleo, host tests), ngspice sims, enclosure + renders, input-protection redesign (`validation/reports/2026-11-09_protection.md`), firmware Stop 1 sleep.
+
+Next steps, in order:
+1. **T decides: sleep while gatewaying.** Today the board never auto-sleeps once TX/gateway has been enabled since boot (~8–9 mA forever on an always-hot inline install), and wakes into listen-only. Options to discuss: (a) gateway mode allowed to sleep, waking straight back into gateway with the first frame(s) lost; (b) pass-through relay/bypass so the car works while the node sleeps (hardware change); (c) keep as is and power from a switched feed. Code: `firmware/src/sleep.c`, `firmware/lib/power.c`.
+2. **Pre-order checks (T, by hand):** J2 Molex 43045 pin order vs the Molex drawing; U1 pin-1 mark and D3 (SMC, new package) orientation in JLC's placement preview.
+3. **Order rev A** from `hardware/fab/` (or `make fab` → `build/fab/`). Then open a PR / merge `rev-a-kicad10` → `main` if T wants.
+4. **Bench bring-up once boards arrive** (see `validation/README.md` for the full plan): sleep current at J2 (`sleep timeout 5`), wake on each bus at 125k/500k/1M, USB re-enumerates after RESET, `rslisten high` reception at 500k, crank-dip behavior of +3V3.
+5. Optional: tidy autorouted crystal/USB traces (ask T first: layout taste); consider a stiffer PTC if one appears at JLC (F1 37.8/40 A Imax in reverse-battery sim).
+
 ## Layout
 ```
 hardware/kicad/        KiCad project: SOURCE OF TRUTH (canode.kicad_pro/.kicad_sch/.kicad_pcb)
