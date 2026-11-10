@@ -108,10 +108,12 @@ print("probe/pick ok")
 print("protocol desc:", a.set_protocol(stp=64))
 print("filter:", a.set_filters([canlog.parse_filter("10240040:1FFFFF00", True)], True))
 
-# reader
+# reader (serial_reader wraps monitor() and reconnects on link loss; the fake
+# never drops the link, so reconnect is a no-op here)
 state = canlog.State()
 log = io.StringIO()
-t = threading.Thread(target=canlog.serial_reader, args=(a, state, log, "can1", True, False), daemon=True)
+t = threading.Thread(target=canlog.serial_reader,
+                     args=(a, state, log, "can1", True, False, lambda adapter: True), daemon=True)
 t.start()
 time.sleep(0.4)
 with state.lock:
@@ -124,9 +126,43 @@ print("logged", len(lines), "frames; ids", sorted(canlog.fmt_id(*k) for k in sta
 assert len(state.ids) == 3
 assert all(canlog.parse_candump(l) for l in lines)
 assert any("BUFFER FULL" in s for s in state.status)
-canlog.render(state, "TEST", "changed", 20)
+# diff/summary helpers run against the captured state without error
+with state.lock:
+    diff = canlog.baseline_diff(state)
+summary = canlog.id_summary(state)
+assert len(summary) == 3 and all({"count", "hz", "last"} <= set(v) for v in summary.values())
+assert isinstance(diff, list)
+print("reader ok")
 
 # write a log for replay testing (temp dir: the tracked tests/sample.log is a static example capture)
 with open(str(__import__("pathlib").Path(__import__("tempfile").gettempdir()) / "canlog_sample.log"), "w") as f:
     f.write(log.getvalue())
-print("reader ok")
+print("replay log written")
+
+# ---- guided-test signal finding (no adapter needed) ----
+# A window is (label, snapshot, toggles, busy): snapshot[id]=last bytes,
+# toggles[id]=[8 bitmasks of bits seen flipping], busy[id]=[8 masks of bits that
+# blinked]. find_signals reports only what every capture agrees on.
+KEY = (0x200, False)
+
+
+def win(label, b0, toggles0=0, busy0=0):
+    return (label,
+            {KEY: bytes([b0])},
+            {KEY: [toggles0] + [0] * 7},
+            {KEY: [busy0] + [0] * 7})
+
+
+# steady bit: byte 0 bit 0 is 0 when off, 1 when on, and never toggles
+steady = canlog.find_signals([win("off", 0x00), win("on", 0x01)], {}, round_len=None)
+assert any("200" in l and "byte 0 bit 0" in l and "off=0" in l and "on=1" in l for l in steady), steady
+
+# blinking bit: byte 0 bit 1 flips (busy) only in the "on" state, across 2 rounds
+blink = canlog.find_signals(
+    [win("off", 0x00), win("on", 0x00, toggles0=0b10, busy0=0b10),
+     win("off", 0x00), win("on", 0x00, toggles0=0b10, busy0=0b10)], {}, round_len=2)
+assert any("blinks while on" in l for l in blink), blink
+
+# a single capture per state cannot yield a signal (needs >=2 distinct labels)
+assert canlog.find_signals([win("only", 0x01)], {}) == []
+print("signals ok")

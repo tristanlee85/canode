@@ -35,7 +35,9 @@ hardware/enclosure/    build123d enclosure (own Python 3.12 venv via uv) + Blend
 hardware/3dmodels/     stand-in STEP models for J1, J2, SW1/SW2 and the mating plug
 firmware/              CMake + HAL + TinyUSB firmware (canode + NUCLEO-G0B1RE); lib/ is host-tested
 validation/sim/        ngspice power-input simulations (vendor models fetched, not committed)
-tools/canlog/          terminal CAN logger/diff tool for STN adapters (OBDLink MX+), tests offline
+tools/canlog/          STN/OBDLink CAN workbench (OBDLink MX+): canlog.py (listen-only logger/diff/
+                       guided tests), cantool.py (active diagnostic read/write), canbus.py (shared
+                       core). Predates the board; used to find messages. Tests offline (test-tools).
 scripts/setup_mac.sh   one-time toolchain install (Homebrew)
 ```
 
@@ -73,6 +75,7 @@ make test-tools  # offline tests for tools/canlog
 - Never transmit on a real vehicle bus without T's explicit OK for that specific test. Default to **listen-only**: FDCAN bus-monitoring mode with the transceiver enabled (Rs low). Bus-monitoring mode sends no ACKs.
 - Hardware default: the transceiver Rs pins are pulled up, which means **standby** (not driving the bus). Firmware must only drive Rs low after the FDCAN peripheral is configured.
 - Bench tests that need termination: bridge JP1/JP2. Never leave them bridged when installing the board in a car, because the car's own network is already terminated.
+- `tools/canlog/cantool.py` is the one tool in this repo that transmits on a vehicle bus (a hand-operated scan-tool substitute, not part of the firmware). It reads by default and sends only after an explicit `arm` + Park confirmation, releasing all overrides on exit. The firmware itself stays listen-only per the rule above.
 
 ## Known open issues (from the rev A review checklist)
 - Not rated for an unsuppressed (87 V) load dump; designed for the 35 V suppressed dump and ISO 7637-2 pulse 2a (SMCJ33A + R17 10 Ω/C1 10 µF ahead of the LDO + R18 2.2 Ω in the D7 path). F1 reaches 37.8 A of its 40 A Imax in a reverse-battery sim.

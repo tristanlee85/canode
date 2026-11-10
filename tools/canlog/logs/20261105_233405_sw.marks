@@ -1,0 +1,73 @@
+BASELINE @ 1793939883.134760
+  82 bits change on their own and are ignored
+TEST Headlight switch START @ 1793939897.517219
+  states: AUTO, OFF, PARK, ON
+STEP Headlight switch | AUTO | 1/13 @ 1793939910.470207
+  window 1793939907.436363 1793939910.436363
+STEP Headlight switch | OFF | 2/13 @ 1793939925.777464
+  window 1793939922.760870 1793939925.760870
+STEP Headlight switch | PARK | 3/13 @ 1793939938.862294
+  window 1793939935.861351 1793939938.861351
+STEP Headlight switch | ON | 4/13 @ 1793939946.978028
+  window 1793939943.959530 1793939946.959530
+STEP Headlight switch | AUTO | 5/13 @ 1793939955.592866
+  window 1793939952.589949 1793939955.589949
+STEP Headlight switch | OFF | 6/13 @ 1793939963.770471
+  window 1793939960.747259 1793939963.747259
+STEP Headlight switch | PARK | 7/13 @ 1793939971.579598
+  window 1793939968.565981 1793939971.565981
+STEP Headlight switch | ON | 8/13 @ 1793939978.229086
+  window 1793939975.220137 1793939978.220137
+STEP Headlight switch | AUTO | 9/13 @ 1793939986.763622
+  window 1793939983.752411 1793939986.752411
+STEP Headlight switch | OFF | 10/13 @ 1793939993.718298
+  window 1793939990.690708 1793939993.690708
+STEP Headlight switch | PARK | 11/13 @ 1793940002.290823
+  window 1793939999.277327 1793940002.277327
+STEP Headlight switch | ON | 12/13 @ 1793940009.682222
+  window 1793940006.661954 1793940009.661954
+STEP Headlight switch | AUTO | 13/13 @ 1793940018.043530
+  window 1793940015.028383 1793940018.028383
+RESULT Headlight switch: 1 candidate(s) @ 1793940018.062110
+  1020C040 byte 3 bit 7:  AUTO=0  OFF=0  PARK=1  ON=1
+TEST High beams START @ 1793940039.903609
+  states: low, high
+STEP High beams | low | 1/7 @ 1793940050.281987
+  window 1793940047.266590 1793940050.266590
+STEP High beams | high | 2/7 @ 1793940057.329319
+  window 1793940054.326514 1793940057.326514
+STEP High beams | low | 3/7 @ 1793940065.766701
+  window 1793940062.750981 1793940065.750981
+STEP High beams | high | 4/7 @ 1793940075.235437
+  window 1793940072.228278 1793940075.228278
+STEP High beams | low | 5/7 @ 1793940083.679257
+  window 1793940080.665370 1793940083.665370
+STEP High beams | high | 6/7 @ 1793940092.157483
+  window 1793940089.151501 1793940092.151501
+STEP High beams | low | 7/7 @ 1793940100.089742
+  window 1793940097.071191 1793940100.071191
+RESULT High beams: 3 candidate(s) @ 1793940100.106293
+  1020C040 byte 1 bit 5:  low=0  high=1
+  1020C040 byte 2 bit 4:  low=0  high=1
+  1020C040 byte 4 bits 0,1:  low=01  high=02
+TEST Fog lights START @ 1793940185.464350
+  states: low beam + fog on, high beam + fog off
+STEP Fog lights | low beam + fog on | 1/7 @ 1793940196.540355
+  window 1793940193.510267 1793940196.510267
+STEP Fog lights | high beam + fog off | 2/7 @ 1793940209.116160
+  window 1793940206.104030 1793940209.104030
+STEP Fog lights | low beam + fog on | 3/7 @ 1793940227.524249
+  window 1793940224.508059 1793940227.508059
+STEP Fog lights | high beam + fog off | 4/7 @ 1793940235.732745
+  window 1793940232.701333 1793940235.701333
+STEP Fog lights | low beam + fog on | 5/7 @ 1793940242.319453
+  window 1793940239.318758 1793940242.318758
+STEP Fog lights | high beam + fog off | 6/7 @ 1793940249.585837
+  window 1793940246.560707 1793940249.560707
+STEP Fog lights | low beam + fog on | 7/7 @ 1793940255.890504
+  window 1793940252.888904 1793940255.888904
+RESULT Fog lights: 4 candidate(s) @ 1793940255.903030
+  1020C040 byte 0 bit 7:  low beam + fog on=1  high beam + fog off=0
+  1020C040 byte 1 bits 1,5:  low beam + fog on=4A  high beam + fog off=68
+  1020C040 byte 2 bit 4:  low beam + fog on=0  high beam + fog off=1
+  1020C040 byte 4 bits 0,1:  low beam + fog on=01  high beam + fog off=02

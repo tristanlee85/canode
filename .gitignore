@@ -25,5 +25,9 @@ validation/sim/out/*
 
 # enclosure: STLs are regenerated from enclosure.py (STEP is committed)
 hardware/enclosure/out/*.stl
+# canlog: raw vehicle captures are large; keep them local. The small .json/.marks
+# session summaries (which carry the decoded findings) are committed.
+tools/canlog/logs/*.log
+tools/canlog/logs/*.raw
 # Claude Code personal settings
 .claude/settings.local.json
