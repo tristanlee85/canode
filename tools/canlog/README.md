@@ -18,6 +18,15 @@ pip install pyserial
 
 ## canlog (listen-only)
 
+![canlog replaying the 2026-11-05 Silverado SW-CAN session](docs/canlog-session.gif)
+
+A real run at 7× speed (the full ~7 min session in ~1 min; MP4:
+[`docs/canlog-session.mp4`](docs/canlog-session.mp4)). It replays the committed
+capture through `canlog.py --replay` and presses the same keys at the same times
+as the original session: learn the baseline, then the Headlight switch, High
+beams and a custom Fog lights guided test, each finding its bits on `0x1020C040`.
+Regenerate with `docs/record_session.py` (instructions in its docstring).
+
 ```bash
 python3 canlog.py --probe                       # one time: list adapter protocols
 python3 canlog.py --bus hs                       # GM high-speed CAN (pins 6/14)
